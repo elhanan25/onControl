@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>מעקב הוצאות יומי</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="/vendor/chart.js/chart.umd.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">כסף יומי, ברור ומסודר</p>
+        <h1>מעקב הוצאות</h1>
+      </div>
+      <div class="date-pill" id="todayLabel"></div>
+    </header>
+
+    <main class="layout">
+      <section class="summary-grid" aria-label="סיכומים">
+        <article class="metric">
+          <span>היום</span>
+          <strong id="todayTotal">₪0</strong>
+        </article>
+        <article class="metric">
+          <span>החודש</span>
+          <strong id="monthTotal">₪0</strong>
+        </article>
+        <article class="metric">
+          <span>סה״כ</span>
+          <strong id="allTotal">₪0</strong>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <form id="expenseForm" class="panel form-panel">
+          <input type="hidden" id="expenseId">
+          <div class="panel-title">
+            <h2 id="formTitle">הוצאה חדשה</h2>
+            <button class="icon-button hidden" type="button" id="cancelEdit" title="בטל עריכה">×</button>
+          </div>
+
+          <label>
+            תאריך
+            <input id="date" name="date" type="date" required>
+          </label>
+
+          <label>
+            סכום
+            <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+          </label>
+
+          <label>
+            קטגוריה
+            <select id="category" name="category" required></select>
+          </label>
+
+          <label>
+            תיאור
+            <input id="description" name="description" type="text" placeholder="קפה, סופר, חשבון...">
+          </label>
+
+          <label>
+            אמצעי תשלום
+            <input id="paymentMethod" name="paymentMethod" type="text" placeholder="אשראי, מזומן, ביט...">
+          </label>
+
+          <p class="form-message" id="formMessage" role="status"></p>
+          <button class="primary-button" type="submit" id="submitButton">שמור הוצאה</button>
+        </form>
+
+        <section class="charts">
+          <div class="chart-panel">
+            <h2>הוצאות לפי יום</h2>
+            <canvas id="dailyChart"></canvas>
+          </div>
+          <div class="chart-panel">
+            <h2>לפי קטגוריה</h2>
+            <canvas id="categoryChart"></canvas>
+          </div>
+          <div class="chart-panel wide">
+            <h2>הוצאות חודשיות</h2>
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-title">
+          <h2>הוצאות אחרונות</h2>
+          <span id="expenseCount"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>תאריך</th>
+                <th>סכום</th>
+                <th>קטגוריה</th>
+                <th>תיאור</th>
+                <th>תשלום</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="expensesBody"></tbody>
+          </table>
+          <p class="empty-state" id="emptyState">עדיין אין הוצאות. ההוצאה הראשונה תדליק את הגרפים.</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

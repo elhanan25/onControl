@@ -1,0 +1,314 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --ink: #17201b;
+  --muted: #6a746d;
+  --line: #dce4de;
+  --green: #146c43;
+  --green-strong: #0f5132;
+  --teal: #007481;
+  --gold: #b7791f;
+  --red: #b42318;
+  --shadow: 0 14px 36px rgba(24, 40, 30, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Arial, "Noto Sans Hebrew", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 28px clamp(18px, 4vw, 52px);
+  border-bottom: 1px solid var(--line);
+  background: #eef5f0;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--teal);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-bottom: 16px;
+  font-size: 1.08rem;
+}
+
+.date-pill {
+  min-width: 160px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.layout {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: 24px clamp(14px, 3vw, 36px) 40px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.metric,
+.panel,
+.chart-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.metric {
+  padding: 18px;
+}
+
+.metric span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+
+.metric strong {
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.panel,
+.chart-panel {
+  padding: 18px;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.form-panel {
+  position: sticky;
+  top: 16px;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 13px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #fbfdfc;
+  color: var(--ink);
+}
+
+input:focus,
+select:focus {
+  outline: 3px solid rgba(0, 116, 129, 0.16);
+  border-color: var(--teal);
+}
+
+.primary-button,
+.small-button,
+.danger-button,
+.icon-button {
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 44px;
+  background: var(--green);
+  color: white;
+}
+
+.primary-button:hover {
+  background: var(--green-strong);
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  background: #eef3ef;
+  color: var(--ink);
+  font-size: 1.25rem;
+}
+
+.small-button,
+.danger-button {
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.small-button {
+  background: #e8f3f4;
+  color: var(--teal);
+}
+
+.danger-button {
+  background: #fee4e2;
+  color: var(--red);
+}
+
+.hidden {
+  display: none;
+}
+
+.form-message {
+  min-height: 20px;
+  margin-bottom: 10px;
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.form-message.error {
+  color: var(--red);
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.chart-panel {
+  min-height: 320px;
+}
+
+.chart-panel.wide {
+  grid-column: 1 / -1;
+}
+
+canvas {
+  width: 100%;
+  max-height: 260px;
+}
+
+.table-panel {
+  margin-top: 20px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+th,
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+td.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.empty-state {
+  display: none;
+  margin: 18px 0 0;
+  color: var(--muted);
+}
+
+.empty-state.visible {
+  display: block;
+}
+
+#expenseCount {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 900px) {
+  .app-header,
+  .workspace {
+    display: block;
+  }
+
+  .date-pill {
+    margin-top: 18px;
+    text-align: right;
+  }
+
+  .summary-grid,
+  .charts {
+    grid-template-columns: 1fr;
+  }
+
+  .form-panel {
+    position: static;
+    margin-bottom: 18px;
+  }
+
+  .chart-panel.wide {
+    grid-column: auto;
+  }
+}

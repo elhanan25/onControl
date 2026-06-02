@@ -1,0 +1,17 @@
+{
+  "name": "daily-expense-tracker",
+  "version": "1.0.0",
+  "description": "Simple daily expense tracker with Vanilla JS, Express, and SQLite.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.9.1",
+    "chart.js": "^4.4.8",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {}
+}
