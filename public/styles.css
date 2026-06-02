@@ -22,7 +22,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--ink);
-  font-family: Arial, "Noto Sans Hebrew", sans-serif;
+  font-family: "Assistant", Arial, sans-serif;
 }
 
 button,

@@ -36,6 +36,16 @@ const dateFormatter = new Intl.DateTimeFormat("he-IL", {
   year: "numeric"
 });
 
+const paymentMethods = [
+  "אשראי",
+  "מזומן",
+  "ביט",
+  "פייבוקס",
+  "העברה בנקאית",
+  "צ'ק",
+  "אחר"
+];
+
 function formatMoney(value) {
   return moneyFormatter.format(Number(value || 0));
 }
@@ -211,6 +221,12 @@ async function loadCategories() {
     .join("");
 }
 
+function loadPaymentMethods() {
+  els.paymentMethod.innerHTML = paymentMethods
+    .map((method) => `<option value="${method}">${method}</option>`)
+    .join("");
+}
+
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const id = els.expenseId.value;
@@ -265,6 +281,7 @@ els.expensesBody.addEventListener("click", async (event) => {
 async function init() {
   els.todayLabel.textContent = dateFormatter.format(new Date());
   els.date.value = todayISO();
+  loadPaymentMethods();
   await loadCategories();
   await refresh();
 }
