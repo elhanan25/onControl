@@ -12,6 +12,7 @@
     "better-sqlite3": "^11.9.1",
     "chart.js": "^4.4.8",
     "express": "^4.21.2",
-    "pg": "^8.21.0"
+    "pg": "^8.21.0",
+    "jsonwebtoken": "^9.0.2"
   }
 }

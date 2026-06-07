@@ -7,12 +7,42 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260607-finance-shell">
+    <link rel="stylesheet" href="styles.css?v=20260607-auth">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
-    <script src="app.js?v=20260607-finance-shell" defer></script>
+    <script src="app.js?v=20260607-auth" defer></script>
   </head>
   <body>
-    <div class="app-shell">
+
+    <!-- Login screen -->
+    <div id="authOverlay" class="auth-overlay">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <span class="brand-mark">₪</span>
+          <div>
+            <strong>ניהול כספים</strong>
+            <span>מעקב אישי</span>
+          </div>
+        </div>
+        <h2 id="authTitle">כניסה לחשבון</h2>
+        <form id="authForm" novalidate>
+          <label>
+            דוא״ל
+            <input id="authEmail" type="email" required placeholder="you@example.com" autocomplete="email">
+          </label>
+          <label>
+            סיסמה
+            <input id="authPassword" type="password" required placeholder="••••••••" autocomplete="current-password" minlength="6">
+          </label>
+          <p class="form-message" id="authMessage" role="status"></p>
+          <button class="primary-button" type="submit" id="authSubmit">כניסה</button>
+        </form>
+        <button class="link-button" type="button" id="authToggle">אין לך חשבון? הרשמה</button>
+      </div>
+    </div>
+
+    <!-- Main app -->
+    <div class="app-shell hidden" id="appShell">
       <aside class="sidebar" aria-label="ניווט ראשי">
         <div class="brand">
           <span class="brand-mark">₪</span>
@@ -32,6 +62,14 @@
             <span>הכנסות</span>
           </button>
         </nav>
+
+        <div class="sidebar-footer">
+          <span id="userEmail" class="user-email"></span>
+          <button class="nav-item logout-button" type="button" id="logoutButton">
+            <span class="nav-icon">↩</span>
+            <span>יציאה</span>
+          </button>
+        </div>
       </aside>
 
       <main class="main-panel">

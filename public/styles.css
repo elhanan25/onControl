@@ -386,6 +386,98 @@ td.actions {
   font-weight: 700;
 }
 
+/* ── Auth overlay ───────────────────────────────────────────────────────── */
+
+.auth-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  place-items: center;
+}
+
+.auth-overlay.visible {
+  display: grid;
+}
+
+.app-shell.hidden {
+  display: none;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(420px, 92vw);
+  padding: 36px 40px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.auth-brand strong,
+.auth-brand span {
+  display: block;
+}
+
+.auth-brand span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.auth-card h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--teal);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── Sidebar footer ─────────────────────────────────────────────────────── */
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.user-email {
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.logout-button {
+  opacity: 0.75;
+}
+
+.logout-button:hover {
+  opacity: 1;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     display: block;
