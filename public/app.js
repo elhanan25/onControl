@@ -1,11 +1,60 @@
+const pageConfig = {
+  expenses: {
+    api: "/api/expenses",
+    title: "מעקב הוצאות",
+    eyebrow: "מה יצא ומתי",
+    singular: "הוצאה",
+    plural: "הוצאות",
+    newTitle: "הוצאה חדשה",
+    editTitle: "עריכת הוצאה",
+    saveText: "שמור הוצאה",
+    updateText: "עדכן הוצאה",
+    savedMessage: "ההוצאה נשמרה.",
+    updatedMessage: "ההוצאה עודכנה.",
+    confirmDelete: "למחוק את ההוצאה הזו?",
+    categoryChart: "הוצאות לפי קטגוריה",
+    monthlyChart: "הוצאות חודשיות",
+    methods: ["אשראי", "מזומן", "ביט", "פייבוקס", "העברה בנקאית", "צ׳ק", "אחר"],
+    colors: {
+      main: "#b42318",
+      fill: "rgba(180, 35, 24, 0.16)"
+    }
+  },
+  incomes: {
+    api: "/api/incomes",
+    title: "מעקב הכנסות",
+    eyebrow: "מה נכנס ומאיפה",
+    singular: "הכנסה",
+    plural: "הכנסות",
+    newTitle: "הכנסה חדשה",
+    editTitle: "עריכת הכנסה",
+    saveText: "שמור הכנסה",
+    updateText: "עדכן הכנסה",
+    savedMessage: "ההכנסה נשמרה.",
+    updatedMessage: "ההכנסה עודכנה.",
+    confirmDelete: "למחוק את ההכנסה הזו?",
+    categoryChart: "הכנסות לפי קטגוריה",
+    monthlyChart: "הכנסות חודשיות",
+    methods: ["בנק", "מזומן", "ביט", "פייבוקס", "אשראי", "אחר"],
+    colors: {
+      main: "#146c43",
+      fill: "rgba(20, 108, 67, 0.16)"
+    }
+  }
+};
+
 const state = {
-  expenses: [],
+  activePage: "expenses",
+  records: [],
   charts: {}
 };
 
 const els = {
-  form: document.querySelector("#expenseForm"),
-  expenseId: document.querySelector("#expenseId"),
+  navItems: document.querySelectorAll(".nav-item"),
+  pageEyebrow: document.querySelector("#pageEyebrow"),
+  pageTitle: document.querySelector("#pageTitle"),
+  form: document.querySelector("#recordForm"),
+  recordId: document.querySelector("#recordId"),
   formTitle: document.querySelector("#formTitle"),
   date: document.querySelector("#date"),
   amount: document.querySelector("#amount"),
@@ -16,12 +65,18 @@ const els = {
   submitButton: document.querySelector("#submitButton"),
   cancelEdit: document.querySelector("#cancelEdit"),
   todayLabel: document.querySelector("#todayLabel"),
+  todayMetricLabel: document.querySelector("#todayMetricLabel"),
+  monthMetricLabel: document.querySelector("#monthMetricLabel"),
+  allMetricLabel: document.querySelector("#allMetricLabel"),
   todayTotal: document.querySelector("#todayTotal"),
   monthTotal: document.querySelector("#monthTotal"),
   allTotal: document.querySelector("#allTotal"),
-  expensesBody: document.querySelector("#expensesBody"),
+  categoryChartTitle: document.querySelector("#categoryChartTitle"),
+  monthlyChartTitle: document.querySelector("#monthlyChartTitle"),
+  tableTitle: document.querySelector("#tableTitle"),
+  recordsBody: document.querySelector("#recordsBody"),
   emptyState: document.querySelector("#emptyState"),
-  expenseCount: document.querySelector("#expenseCount")
+  recordCount: document.querySelector("#recordCount")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -36,15 +91,9 @@ const dateFormatter = new Intl.DateTimeFormat("he-IL", {
   year: "numeric"
 });
 
-const paymentMethods = [
-  "אשראי",
-  "מזומן",
-  "ביט",
-  "פייבוקס",
-  "העברה בנקאית",
-  "צ'ק",
-  "אחר"
-];
+function currentConfig() {
+  return pageConfig[state.activePage];
+}
 
 function formatMoney(value) {
   return moneyFormatter.format(Number(value || 0));
@@ -62,7 +111,7 @@ async function api(path, options = {}) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || "בקשה נכשלה.");
+    throw new Error(body.error || "הבקשה נכשלה.");
   }
 
   if (response.status === 204) {
@@ -77,7 +126,7 @@ function setMessage(message, isError = false) {
   els.formMessage.classList.toggle("error", isError);
 }
 
-function getFormExpense() {
+function getFormRecord() {
   return {
     date: els.date.value,
     amount: els.amount.value,
@@ -87,49 +136,56 @@ function getFormExpense() {
   };
 }
 
+function fillSelect(select, items) {
+  select.innerHTML = items.map((item) => `<option value="${item}">${item}</option>`).join("");
+}
+
 function resetForm() {
+  const config = currentConfig();
   els.form.reset();
-  els.expenseId.value = "";
+  els.recordId.value = "";
   els.date.value = todayISO();
-  els.formTitle.textContent = "הוצאה חדשה";
-  els.submitButton.textContent = "שמור הוצאה";
+  els.formTitle.textContent = config.newTitle;
+  els.submitButton.textContent = config.saveText;
   els.cancelEdit.classList.add("hidden");
   setMessage("");
 }
 
-function startEdit(expense) {
-  els.expenseId.value = expense.id;
-  els.date.value = expense.date;
-  els.amount.value = expense.amount;
-  els.category.value = expense.category;
-  els.description.value = expense.description;
-  els.paymentMethod.value = expense.paymentMethod;
-  els.formTitle.textContent = "עריכת הוצאה";
-  els.submitButton.textContent = "עדכן הוצאה";
+function startEdit(record) {
+  const config = currentConfig();
+  els.recordId.value = record.id;
+  els.date.value = record.date;
+  els.amount.value = record.amount;
+  els.category.value = record.category;
+  els.description.value = record.description;
+  els.paymentMethod.value = record.paymentMethod;
+  els.formTitle.textContent = config.editTitle;
+  els.submitButton.textContent = config.updateText;
   els.cancelEdit.classList.remove("hidden");
   setMessage("");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  els.form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function renderExpenses() {
-  els.expensesBody.innerHTML = "";
-  els.emptyState.classList.toggle("visible", state.expenses.length === 0);
-  els.expenseCount.textContent = `${state.expenses.length} הוצאות`;
+function renderRows() {
+  const config = currentConfig();
+  els.recordsBody.innerHTML = "";
+  els.emptyState.classList.toggle("visible", state.records.length === 0);
+  els.recordCount.textContent = `${state.records.length} ${config.plural}`;
 
-  state.expenses.forEach((expense) => {
+  state.records.forEach((record) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${expense.date}</td>
-      <td>${formatMoney(expense.amount)}</td>
-      <td>${expense.category}</td>
-      <td>${expense.description || "-"}</td>
-      <td>${expense.paymentMethod || "-"}</td>
+      <td>${record.date}</td>
+      <td>${formatMoney(record.amount)}</td>
+      <td>${record.category}</td>
+      <td>${record.description || "-"}</td>
+      <td>${record.paymentMethod || "-"}</td>
       <td class="actions">
-        <button class="small-button" type="button" data-action="edit" data-id="${expense.id}">ערוך</button>
-        <button class="danger-button" type="button" data-action="delete" data-id="${expense.id}">מחק</button>
+        <button class="small-button" type="button" data-action="edit" data-id="${record.id}">ערוך</button>
+        <button class="danger-button" type="button" data-action="delete" data-id="${record.id}">מחק</button>
       </td>
     `;
-    els.expensesBody.appendChild(row);
+    els.recordsBody.appendChild(row);
   });
 }
 
@@ -139,7 +195,10 @@ function chartColors(count) {
 }
 
 function upsertChart(key, canvasId, type, labels, values, label) {
+  const config = currentConfig();
   const context = document.querySelector(canvasId);
+  if (!context) return;
+
   if (state.charts[key]) {
     state.charts[key].destroy();
   }
@@ -152,10 +211,12 @@ function upsertChart(key, canvasId, type, labels, values, label) {
         {
           label,
           data: values,
-          borderColor: "#146c43",
-          backgroundColor: type === "doughnut" ? chartColors(values.length) : "rgba(20, 108, 67, 0.18)",
+          borderColor: config.colors.main,
+          backgroundColor: type === "doughnut" ? chartColors(values.length) : config.colors.fill,
+          borderWidth: 2,
+          borderRadius: type === "bar" ? 8 : 0,
           tension: 0.35,
-          fill: type === "line"
+          fill: false
         }
       ]
     },
@@ -171,18 +232,10 @@ function upsertChart(key, canvasId, type, labels, values, label) {
 }
 
 function renderSummary(summary) {
+  const config = currentConfig();
   els.todayTotal.textContent = formatMoney(summary.totals.today);
   els.monthTotal.textContent = formatMoney(summary.totals.month);
   els.allTotal.textContent = formatMoney(summary.totals.total);
-
-  upsertChart(
-    "daily",
-    "#dailyChart",
-    "line",
-    summary.daily.map((item) => item.date),
-    summary.daily.map((item) => item.amount),
-    "סכום יומי"
-  );
 
   upsertChart(
     "category",
@@ -190,7 +243,7 @@ function renderSummary(summary) {
     "doughnut",
     summary.category.map((item) => item.category),
     summary.category.map((item) => item.amount),
-    "קטגוריות"
+    config.categoryChart
   );
 
   upsertChart(
@@ -199,52 +252,73 @@ function renderSummary(summary) {
     "bar",
     summary.monthly.map((item) => item.month),
     summary.monthly.map((item) => item.amount),
-    "סכום חודשי"
+    config.monthlyChart
   );
 }
 
-async function refresh() {
-  const [expenses, summary] = await Promise.all([
-    api("/api/expenses"),
-    api("/api/summary")
-  ]);
+function applyPageText() {
+  const config = currentConfig();
+  els.pageEyebrow.textContent = config.eyebrow;
+  els.pageTitle.textContent = config.title;
+  els.todayMetricLabel.textContent = `${config.singular} היום`;
+  els.monthMetricLabel.textContent = `${config.singular} החודש`;
+  els.allMetricLabel.textContent = `סה״כ ${config.plural}`;
+  els.categoryChartTitle.textContent = config.categoryChart;
+  els.monthlyChartTitle.textContent = config.monthlyChart;
+  els.tableTitle.textContent = `${config.plural} אחרונות`;
 
-  state.expenses = expenses.expenses;
-  renderExpenses();
-  renderSummary(summary);
+  els.navItems.forEach((item) => {
+    item.classList.toggle("active", item.dataset.page === state.activePage);
+  });
 }
 
 async function loadCategories() {
-  const data = await api("/api/categories");
-  els.category.innerHTML = data.categories
-    .map((category) => `<option value="${category}">${category}</option>`)
-    .join("");
+  const config = currentConfig();
+  const data = await api(`${config.api}/categories`);
+  fillSelect(els.category, data.categories);
+  fillSelect(els.paymentMethod, config.methods);
 }
 
-function loadPaymentMethods() {
-  els.paymentMethod.innerHTML = paymentMethods
-    .map((method) => `<option value="${method}">${method}</option>`)
-    .join("");
+async function refresh() {
+  const config = currentConfig();
+  const [records, summary] = await Promise.all([
+    api(config.api),
+    api(`${config.api}/summary`)
+  ]);
+
+  state.records = records.records;
+  renderRows();
+  renderSummary(summary);
+}
+
+async function switchPage(page) {
+  if (!pageConfig[page] || state.activePage === page) return;
+  state.activePage = page;
+  applyPageText();
+  await loadCategories();
+  resetForm();
+  await refresh();
 }
 
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const id = els.expenseId.value;
-  const expense = getFormExpense();
+  const config = currentConfig();
+  const id = els.recordId.value;
+  const record = getFormRecord();
 
   try {
     if (id) {
-      await api(`/api/expenses/${id}`, {
+      await api(`${config.api}/${id}`, {
         method: "PUT",
-        body: JSON.stringify(expense)
+        body: JSON.stringify(record)
       });
-      setMessage("ההוצאה עודכנה.");
+      setMessage(config.updatedMessage);
     } else {
-      await api("/api/expenses", {
+      await api(config.api, {
         method: "POST",
-        body: JSON.stringify(expense)
+        body: JSON.stringify(record)
       });
-      setMessage("ההוצאה נשמרה.");
+      setMessage(config.savedMessage);
     }
 
     resetForm();
@@ -256,33 +330,45 @@ els.form.addEventListener("submit", async (event) => {
 
 els.cancelEdit.addEventListener("click", resetForm);
 
-els.expensesBody.addEventListener("click", async (event) => {
+els.recordsBody.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
+  const config = currentConfig();
   const id = Number(button.dataset.id);
-  const expense = state.expenses.find((item) => item.id === id);
-  if (!expense) return;
+  const record = state.records.find((item) => item.id === id);
+  if (!record) return;
 
   if (button.dataset.action === "edit") {
-    startEdit(expense);
+    startEdit(record);
     return;
   }
 
   if (button.dataset.action === "delete") {
-    const confirmed = window.confirm("למחוק את ההוצאה הזו?");
+    const confirmed = window.confirm(config.confirmDelete);
     if (!confirmed) return;
 
-    await api(`/api/expenses/${id}`, { method: "DELETE" });
-    await refresh();
+    try {
+      await api(`${config.api}/${id}`, { method: "DELETE" });
+      await refresh();
+      resetForm();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
   }
+});
+
+els.navItems.forEach((item) => {
+  item.addEventListener("click", () => {
+    switchPage(item.dataset.page).catch((error) => setMessage(error.message, true));
+  });
 });
 
 async function init() {
   els.todayLabel.textContent = dateFormatter.format(new Date());
-  els.date.value = todayISO();
-  loadPaymentMethods();
+  applyPageText();
   await loadCategories();
+  resetForm();
   await refresh();
 }
 

@@ -8,22 +8,28 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const databaseUrl = process.env.DATABASE_URL;
 
-const categories = [
-  "מזון",
-  "תחבורה",
-  "דיור",
-  "בריאות",
-  "בילויים",
-  "קניות",
-  "חשבונות",
-  "אחר"
-];
+const ledgerTypes = {
+  expenses: {
+    table: "expenses",
+    singular: "expense",
+    categories: ["מזון", "תחבורה", "דיור", "בריאות", "בילויים", "קניות", "חשבונות", "אחר"]
+  },
+  incomes: {
+    table: "incomes",
+    singular: "income",
+    categories: ["משכורת", "עצמאי", "השקעות", "מתנה", "החזר", "בונוס", "אחר"]
+  }
+};
 
 function roundMoney(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
-function normalizeExpense(input) {
+function getLedgerConfig(type) {
+  return ledgerTypes[type] || null;
+}
+
+function normalizeRecord(input) {
   const date = String(input.date || "").trim();
   const amount = Number(input.amount);
   const category = String(input.category || "").trim();
@@ -53,9 +59,9 @@ function normalizeExpense(input) {
   };
 }
 
-function mapExpense(row) {
+function mapRecord(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     date: row.date,
     amount: Number(row.amount),
     category: row.category,
@@ -66,14 +72,9 @@ function mapExpense(row) {
   };
 }
 
-function createSqliteStore() {
-  const dbPath = process.env.DB_PATH || path.join(__dirname, "..", "work", "expenses.db");
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
-
-  db.pragma("journal_mode = WAL");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS expenses (
+function sqliteCreateTableSql(table) {
+  return `
+    CREATE TABLE IF NOT EXISTS ${table} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT NOT NULL,
       amount REAL NOT NULL CHECK(amount > 0),
@@ -83,27 +84,55 @@ function createSqliteStore() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-  `);
+  `;
+}
+
+function postgresCreateTableSql(table) {
+  return `
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id BIGSERIAL PRIMARY KEY,
+      date DATE NOT NULL,
+      amount NUMERIC(12, 2) NOT NULL CHECK(amount > 0),
+      category TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      payment_method TEXT DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+}
+
+function createSqliteStore() {
+  const dbPath = process.env.DB_PATH || path.join(__dirname, "..", "work", "expenses.db");
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  const db = new Database(dbPath);
+
+  db.pragma("journal_mode = WAL");
+  Object.values(ledgerTypes).forEach((config) => {
+    db.exec(sqliteCreateTableSql(config.table));
+  });
 
   return {
     name: "SQLite",
-    async listExpenses() {
-      return db.prepare("SELECT * FROM expenses ORDER BY date DESC, id DESC").all().map(mapExpense);
+    async list(type) {
+      const { table } = getLedgerConfig(type);
+      return db.prepare(`SELECT * FROM ${table} ORDER BY date DESC, id DESC`).all().map(mapRecord);
     },
-    async createExpense(expense) {
+    async create(type, record) {
+      const { table } = getLedgerConfig(type);
       const result = db
         .prepare(`
-          INSERT INTO expenses (date, amount, category, description, payment_method)
+          INSERT INTO ${table} (date, amount, category, description, payment_method)
           VALUES (@date, @amount, @category, @description, @paymentMethod)
         `)
-        .run(expense);
-      const row = db.prepare("SELECT * FROM expenses WHERE id = ?").get(result.lastInsertRowid);
-      return mapExpense(row);
+        .run(record);
+      return mapRecord(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(result.lastInsertRowid));
     },
-    async updateExpense(id, expense) {
+    async update(type, id, record) {
+      const { table } = getLedgerConfig(type);
       const result = db
         .prepare(`
-          UPDATE expenses
+          UPDATE ${table}
           SET date = @date,
               amount = @amount,
               category = @category,
@@ -112,34 +141,33 @@ function createSqliteStore() {
               updated_at = CURRENT_TIMESTAMP
           WHERE id = @id
         `)
-        .run({ ...expense, id });
+        .run({ ...record, id });
 
       if (result.changes === 0) return null;
-      return mapExpense(db.prepare("SELECT * FROM expenses WHERE id = ?").get(id));
+      return mapRecord(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id));
     },
-    async deleteExpense(id) {
-      return db.prepare("DELETE FROM expenses WHERE id = ?").run(id).changes > 0;
+    async delete(type, id) {
+      const { table } = getLedgerConfig(type);
+      return db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes > 0;
     },
-    async getSummary() {
+    async summary(type) {
+      const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
       const month = today.slice(0, 7);
-      const total = db.prepare("SELECT COALESCE(SUM(amount), 0) AS value FROM expenses").get().value;
+      const total = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table}`).get().value;
       const todayTotal = db
-        .prepare("SELECT COALESCE(SUM(amount), 0) AS value FROM expenses WHERE date = ?")
+        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE date = ?`)
         .get(today).value;
       const monthTotal = db
-        .prepare("SELECT COALESCE(SUM(amount), 0) AS value FROM expenses WHERE substr(date, 1, 7) = ?")
+        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE substr(date, 1, 7) = ?`)
         .get(month).value;
-      const daily = db
-        .prepare("SELECT date, ROUND(SUM(amount), 2) AS amount FROM expenses GROUP BY date ORDER BY date ASC")
-        .all();
       const category = db
-        .prepare("SELECT category, ROUND(SUM(amount), 2) AS amount FROM expenses GROUP BY category ORDER BY amount DESC")
+        .prepare(`SELECT category, ROUND(SUM(amount), 2) AS amount FROM ${table} GROUP BY category ORDER BY amount DESC`)
         .all();
       const monthly = db
         .prepare(`
           SELECT substr(date, 1, 7) AS month, ROUND(SUM(amount), 2) AS amount
-          FROM expenses
+          FROM ${table}
           GROUP BY substr(date, 1, 7)
           ORDER BY month ASC
         `)
@@ -151,7 +179,6 @@ function createSqliteStore() {
           today: roundMoney(todayTotal),
           month: roundMoney(monthTotal)
         },
-        daily,
         category,
         monthly
       };
@@ -165,18 +192,7 @@ async function createPostgresStore() {
     ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
   });
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS expenses (
-      id BIGSERIAL PRIMARY KEY,
-      date DATE NOT NULL,
-      amount NUMERIC(12, 2) NOT NULL CHECK(amount > 0),
-      category TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      payment_method TEXT DEFAULT '',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+  await Promise.all(Object.values(ledgerTypes).map((config) => pool.query(postgresCreateTableSql(config.table))));
 
   const toRows = (result) => result.rows.map((row) => ({
     ...row,
@@ -187,25 +203,28 @@ async function createPostgresStore() {
 
   return {
     name: "PostgreSQL",
-    async listExpenses() {
-      const result = await pool.query("SELECT * FROM expenses ORDER BY date DESC, id DESC");
-      return toRows(result).map(mapExpense);
+    async list(type) {
+      const { table } = getLedgerConfig(type);
+      const result = await pool.query(`SELECT * FROM ${table} ORDER BY date DESC, id DESC`);
+      return toRows(result).map(mapRecord);
     },
-    async createExpense(expense) {
+    async create(type, record) {
+      const { table } = getLedgerConfig(type);
       const result = await pool.query(
         `
-          INSERT INTO expenses (date, amount, category, description, payment_method)
+          INSERT INTO ${table} (date, amount, category, description, payment_method)
           VALUES ($1, $2, $3, $4, $5)
           RETURNING *
         `,
-        [expense.date, expense.amount, expense.category, expense.description, expense.paymentMethod]
+        [record.date, record.amount, record.category, record.description, record.paymentMethod]
       );
-      return mapExpense(toRows(result)[0]);
+      return mapRecord(toRows(result)[0]);
     },
-    async updateExpense(id, expense) {
+    async update(type, id, record) {
+      const { table } = getLedgerConfig(type);
       const result = await pool.query(
         `
-          UPDATE expenses
+          UPDATE ${table}
           SET date = $1,
               amount = $2,
               category = $3,
@@ -215,43 +234,39 @@ async function createPostgresStore() {
           WHERE id = $6
           RETURNING *
         `,
-        [expense.date, expense.amount, expense.category, expense.description, expense.paymentMethod, id]
+        [record.date, record.amount, record.category, record.description, record.paymentMethod, id]
       );
-      return result.rowCount === 0 ? null : mapExpense(toRows(result)[0]);
+      return result.rowCount === 0 ? null : mapRecord(toRows(result)[0]);
     },
-    async deleteExpense(id) {
-      const result = await pool.query("DELETE FROM expenses WHERE id = $1", [id]);
+    async delete(type, id) {
+      const { table } = getLedgerConfig(type);
+      const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
       return result.rowCount > 0;
     },
-    async getSummary() {
+    async summary(type) {
+      const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
       const month = today.slice(0, 7);
-      const [totals, daily, category, monthly] = await Promise.all([
+      const [totals, category, monthly] = await Promise.all([
         pool.query(
           `
             SELECT
               COALESCE(SUM(amount), 0) AS total,
               COALESCE(SUM(amount) FILTER (WHERE date = $1::date), 0) AS today,
               COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = $2), 0) AS month
-            FROM expenses
+            FROM ${table}
           `,
           [today, month]
         ),
         pool.query(`
-          SELECT to_char(date, 'YYYY-MM-DD') AS date, ROUND(SUM(amount), 2)::float AS amount
-          FROM expenses
-          GROUP BY date
-          ORDER BY date ASC
-        `),
-        pool.query(`
           SELECT category, ROUND(SUM(amount), 2)::float AS amount
-          FROM expenses
+          FROM ${table}
           GROUP BY category
           ORDER BY amount DESC
         `),
         pool.query(`
           SELECT to_char(date, 'YYYY-MM') AS month, ROUND(SUM(amount), 2)::float AS amount
-          FROM expenses
+          FROM ${table}
           GROUP BY to_char(date, 'YYYY-MM')
           ORDER BY month ASC
         `)
@@ -263,7 +278,6 @@ async function createPostgresStore() {
           today: roundMoney(totals.rows[0].today),
           month: roundMoney(totals.rows[0].month)
         },
-        daily: daily.rows,
         category: category.rows,
         monthly: monthly.rows
       };
@@ -277,6 +291,17 @@ function asyncHandler(handler) {
   };
 }
 
+function requireLedger(req, res, next) {
+  const config = getLedgerConfig(req.params.type);
+  if (!config) {
+    res.status(404).json({ error: "העמוד המבוקש לא נמצא." });
+    return;
+  }
+
+  req.ledger = config;
+  next();
+}
+
 async function main() {
   const store = databaseUrl ? await createPostgresStore() : createSqliteStore();
 
@@ -288,64 +313,66 @@ async function main() {
     res.json({ ok: true, database: store.name });
   });
 
-  app.get("/api/categories", (req, res) => {
-    res.json({ categories });
+  app.get("/api/:type/categories", requireLedger, (req, res) => {
+    res.json({ categories: req.ledger.categories });
   });
 
-  app.get("/api/expenses", asyncHandler(async (req, res) => {
-    res.json({ expenses: await store.listExpenses() });
+  app.get("/api/:type", requireLedger, asyncHandler(async (req, res) => {
+    const records = await store.list(req.params.type);
+    res.json({ [req.ledger.singular + "s"]: records, records });
   }));
 
-  app.post("/api/expenses", asyncHandler(async (req, res) => {
-    const normalized = normalizeExpense(req.body);
+  app.post("/api/:type", requireLedger, asyncHandler(async (req, res) => {
+    const normalized = normalizeRecord(req.body);
     if (normalized.error) {
       res.status(400).json({ error: normalized.error });
       return;
     }
 
-    res.status(201).json({ expense: await store.createExpense(normalized.value) });
+    const record = await store.create(req.params.type, normalized.value);
+    res.status(201).json({ [req.ledger.singular]: record, record });
   }));
 
-  app.put("/api/expenses/:id", asyncHandler(async (req, res) => {
+  app.get("/api/:type/summary", requireLedger, asyncHandler(async (req, res) => {
+    res.json(await store.summary(req.params.type));
+  }));
+
+  app.put("/api/:type/:id", requireLedger, asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
-      res.status(400).json({ error: "מזהה הוצאה לא תקין." });
+      res.status(400).json({ error: "מזהה הרשומה לא תקין." });
       return;
     }
 
-    const normalized = normalizeExpense(req.body);
+    const normalized = normalizeRecord(req.body);
     if (normalized.error) {
       res.status(400).json({ error: normalized.error });
       return;
     }
 
-    const expense = await store.updateExpense(id, normalized.value);
-    if (!expense) {
-      res.status(404).json({ error: "ההוצאה לא נמצאה." });
+    const record = await store.update(req.params.type, id, normalized.value);
+    if (!record) {
+      res.status(404).json({ error: "הרשומה לא נמצאה." });
       return;
     }
 
-    res.json({ expense });
+    res.json({ [req.ledger.singular]: record, record });
   }));
 
-  app.delete("/api/expenses/:id", asyncHandler(async (req, res) => {
+  app.delete("/api/:type/:id", requireLedger, asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
-      res.status(400).json({ error: "מזהה הוצאה לא תקין." });
+      res.status(400).json({ error: "מזהה הרשומה לא תקין." });
       return;
     }
 
-    const deleted = await store.deleteExpense(id);
+    const deleted = await store.delete(req.params.type, id);
     if (!deleted) {
-      res.status(404).json({ error: "ההוצאה לא נמצאה." });
+      res.status(404).json({ error: "הרשומה לא נמצאה." });
       return;
     }
 
     res.status(204).send();
-  }));
-
-  app.get("/api/summary", asyncHandler(async (req, res) => {
-    res.json(await store.getSummary());
   }));
 
   app.use((error, req, res, next) => {
@@ -354,7 +381,7 @@ async function main() {
   });
 
   app.listen(port, () => {
-    console.log(`Expense tracker running at http://localhost:${port} using ${store.name}`);
+    console.log(`Finance tracker running at http://localhost:${port} using ${store.name}`);
   });
 }
 
