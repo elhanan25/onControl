@@ -208,11 +208,11 @@ async function createPostgresStore() {
 
   await Promise.all(Object.values(ledgerTypes).map((config) => pool.query(postgresCreateTableSql(config.table))));
 
-  // Add user_id column to existing tables if missing
-  await Promise.all(Object.values(ledgerTypes).map((config) => Promise.all([
-    pool.query(`ALTER TABLE ${config.table} ADD COLUMN IF NOT EXISTS user_id TEXT`),
-    pool.query(`CREATE INDEX IF NOT EXISTS idx_${config.table}_user_id ON ${config.table}(user_id)`)
-  ])));
+  // Add user_id column to existing tables if missing (sequential — index needs column to exist first)
+  for (const config of Object.values(ledgerTypes)) {
+    await pool.query(`ALTER TABLE ${config.table} ADD COLUMN IF NOT EXISTS user_id TEXT`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${config.table}_user_id ON ${config.table}(user_id)`);
+  }
 
   const toRows = (result) => result.rows.map((row) => ({
     ...row,
