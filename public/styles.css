@@ -350,28 +350,84 @@ canvas {
 
 .table-panel {
   margin-top: 18px;
+  padding-bottom: 12px;
 }
 
 .table-wrap {
-  overflow-x: auto;
+  max-height: 430px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  table-layout: fixed;
+  min-width: 860px;
 }
 
 th,
 td {
-  padding: 12px 10px;
+  padding: 13px 12px;
   border-bottom: 1px solid var(--line);
   text-align: right;
+  vertical-align: middle;
 }
 
 th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7faf9;
   color: var(--muted);
   font-size: 0.88rem;
+  font-weight: 800;
+}
+
+th:nth-child(1),
+td:nth-child(1) {
+  width: 120px;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
+  width: 125px;
+}
+
+th:nth-child(3),
+td:nth-child(3) {
+  width: 135px;
+}
+
+th:nth-child(4),
+td:nth-child(4) {
+  width: auto;
+}
+
+th:nth-child(5),
+td:nth-child(5) {
+  width: 150px;
+}
+
+th:nth-child(6),
+td:nth-child(6) {
+  width: 150px;
+}
+
+td:not(.actions-cell) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+tbody tr {
+  background: var(--surface);
+}
+
+tbody tr:hover {
+  background: #f8fbfb;
 }
 
 .actions-cell {
@@ -386,7 +442,8 @@ th {
 
 .empty-state {
   display: none;
-  margin: 18px 0 0;
+  margin: 0;
+  padding: 20px;
   color: var(--muted);
 }
 

@@ -182,6 +182,23 @@ function startEdit(record) {
   els.amount.focus();
 }
 
+function findRecord(id) {
+  return state.records.find((item) => String(item.id) === String(id));
+}
+
+function handleRecordAction(action, id) {
+  const record = findRecord(id);
+  if (!record) return;
+
+  if (action === "edit") {
+    startEdit(record);
+  }
+
+  if (action === "delete") {
+    deleteRecord(record);
+  }
+}
+
 function renderRows() {
   const config = currentConfig();
   els.recordsBody.innerHTML = "";
@@ -210,20 +227,12 @@ function renderRows() {
     editButton.dataset.action = "edit";
     editButton.dataset.id = record.id;
     editButton.textContent = "ערוך";
-    editButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      startEdit(record);
-    });
 
     deleteButton.className = "danger-button";
     deleteButton.type = "button";
     deleteButton.dataset.action = "delete";
     deleteButton.dataset.id = record.id;
     deleteButton.textContent = "מחק";
-    deleteButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      deleteRecord(record);
-    });
 
     actionsWrap.append(editButton, deleteButton);
     actionsCell.appendChild(actionsWrap);
@@ -373,22 +382,14 @@ els.form.addEventListener("submit", async (event) => {
 
 els.cancelEdit.addEventListener("click", resetForm);
 
-els.recordsBody.addEventListener("click", (event) => {
+document.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
-  if (!button) return;
+  if (!button || !els.recordsBody.contains(button)) return;
 
-  const id = Number(button.dataset.id);
-  const record = state.records.find((item) => Number(item.id) === id);
-  if (!record) return;
-
-  if (button.dataset.action === "edit") {
-    startEdit(record);
-  }
-
-  if (button.dataset.action === "delete") {
-    deleteRecord(record);
-  }
-});
+  event.preventDefault();
+  event.stopPropagation();
+  handleRecordAction(button.dataset.action, button.dataset.id);
+}, true);
 
 async function deleteRecord(record) {
   const config = currentConfig();
