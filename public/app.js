@@ -1,3 +1,90 @@
+// ── Auth ────────────────────────────────────────────────────────────────────
+
+let supabaseClient = null;
+let currentSession = null;
+
+async function initSupabase() {
+  const config = await fetch("/api/config").then((r) => r.json());
+  supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session;
+}
+
+function showAuthOverlay() {
+  document.getElementById("authOverlay").classList.add("visible");
+  document.getElementById("appShell").classList.add("hidden");
+}
+
+function hideAuthOverlay() {
+  document.getElementById("authOverlay").classList.remove("visible");
+  document.getElementById("appShell").classList.remove("hidden");
+}
+
+function setAuthMessage(msg, isError = false) {
+  const el = document.getElementById("authMessage");
+  el.textContent = msg;
+  el.classList.toggle("error", isError);
+}
+
+let authMode = "login";
+
+document.getElementById("authToggle").addEventListener("click", () => {
+  authMode = authMode === "login" ? "signup" : "login";
+  const isLogin = authMode === "login";
+  document.getElementById("authTitle").textContent = isLogin ? "כניסה לחשבון" : "יצירת חשבון";
+  document.getElementById("authSubmit").textContent = isLogin ? "כניסה" : "הרשמה";
+  document.getElementById("authToggle").textContent = isLogin
+    ? "אין לך חשבון? הרשמה"
+    : "יש לך חשבון? כניסה";
+  setAuthMessage("");
+});
+
+document.getElementById("authForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("authEmail").value;
+  const password = document.getElementById("authPassword").value;
+  const submitBtn = document.getElementById("authSubmit");
+  submitBtn.disabled = true;
+  setAuthMessage(authMode === "login" ? "מתחבר..." : "יוצר חשבון...");
+
+  const { data, error } = authMode === "login"
+    ? await supabaseClient.auth.signInWithPassword({ email, password })
+    : await supabaseClient.auth.signUp({ email, password });
+
+  submitBtn.disabled = false;
+
+  if (error) {
+    setAuthMessage(translateAuthError(error.message), true);
+    return;
+  }
+
+  if (authMode === "signup" && !data.session) {
+    setAuthMessage("נשלח אימייל אישור. יש לאמת את הכתובת לפני הכניסה.");
+    return;
+  }
+
+  currentSession = data.session;
+  document.getElementById("userEmail").textContent = data.user.email;
+  hideAuthOverlay();
+  await init();
+});
+
+document.getElementById("logoutButton").addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  currentSession = null;
+  showAuthOverlay();
+});
+
+function translateAuthError(msg) {
+  if (msg.includes("Invalid login credentials")) return "כתובת דוא״ל או סיסמה שגויים.";
+  if (msg.includes("Email not confirmed")) return "יש לאמת את כתובת הדוא״ל תחילה.";
+  if (msg.includes("User already registered")) return "כתובת הדוא״ל כבר רשומה.";
+  if (msg.includes("Password should be at least")) return "הסיסמה חייבת להכיל לפחות 6 תווים.";
+  return msg;
+}
+
+// ── App config ───────────────────────────────────────────────────────────────
+
 const pageConfig = {
   expenses: {
     api: "/api/expenses",
@@ -50,7 +137,7 @@ const state = {
 };
 
 const els = {
-  navItems: document.querySelectorAll(".nav-item"),
+  navItems: document.querySelectorAll(".nav-item[data-page]"),
   pageEyebrow: document.querySelector("#pageEyebrow"),
   pageTitle: document.querySelector("#pageTitle"),
   form: document.querySelector("#recordForm"),
@@ -117,10 +204,20 @@ function ensureSelectValue(select, value) {
 }
 
 async function api(path, options = {}) {
+  const token = currentSession?.access_token;
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    },
     ...options
   });
+
+  if (response.status === 401) {
+    currentSession = null;
+    showAuthOverlay();
+    throw new Error("הפעלה פגה תוקפה. יש להתחבר מחדש.");
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -421,6 +518,22 @@ async function init() {
   await refresh();
 }
 
-init().catch((error) => {
-  setMessage(error.message, true);
-});
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+
+(async () => {
+  const session = await initSupabase();
+
+  if (session) {
+    currentSession = session;
+    document.getElementById("userEmail").textContent = session.user.email;
+    hideAuthOverlay();
+    await init();
+  } else {
+    showAuthOverlay();
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    currentSession = session;
+    if (!session) showAuthOverlay();
+  });
+})().catch(console.error);

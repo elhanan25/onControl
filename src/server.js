@@ -3,6 +3,7 @@ const fs = require("fs");
 const express = require("express");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -81,6 +82,7 @@ function sqliteCreateTableSql(table) {
       category TEXT NOT NULL,
       description TEXT DEFAULT '',
       payment_method TEXT DEFAULT '',
+      user_id TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -96,6 +98,7 @@ function postgresCreateTableSql(table) {
       category TEXT NOT NULL,
       description TEXT DEFAULT '',
       payment_method TEXT DEFAULT '',
+      user_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -110,25 +113,35 @@ function createSqliteStore() {
   db.pragma("journal_mode = WAL");
   Object.values(ledgerTypes).forEach((config) => {
     db.exec(sqliteCreateTableSql(config.table));
+    try {
+      db.exec(`ALTER TABLE ${config.table} ADD COLUMN user_id TEXT`);
+    } catch {
+      // column already exists
+    }
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_${config.table}_user_id ON ${config.table}(user_id)`);
+    } catch {
+      // index already exists
+    }
   });
 
   return {
     name: "SQLite",
-    async list(type) {
+    async list(type, userId) {
       const { table } = getLedgerConfig(type);
-      return db.prepare(`SELECT * FROM ${table} ORDER BY date DESC, id DESC`).all().map(mapRecord);
+      return db.prepare(`SELECT * FROM ${table} WHERE user_id = ? ORDER BY date DESC, id DESC`).all(userId).map(mapRecord);
     },
-    async create(type, record) {
+    async create(type, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = db
         .prepare(`
-          INSERT INTO ${table} (date, amount, category, description, payment_method)
-          VALUES (@date, @amount, @category, @description, @paymentMethod)
+          INSERT INTO ${table} (date, amount, category, description, payment_method, user_id)
+          VALUES (@date, @amount, @category, @description, @paymentMethod, @userId)
         `)
-        .run(record);
+        .run({ ...record, userId });
       return mapRecord(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(result.lastInsertRowid));
     },
-    async update(type, id, record) {
+    async update(type, id, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = db
         .prepare(`
@@ -139,39 +152,40 @@ function createSqliteStore() {
               description = @description,
               payment_method = @paymentMethod,
               updated_at = CURRENT_TIMESTAMP
-          WHERE id = @id
+          WHERE id = @id AND user_id = @userId
         `)
-        .run({ ...record, id });
+        .run({ ...record, id, userId });
 
       if (result.changes === 0) return null;
       return mapRecord(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id));
     },
-    async delete(type, id) {
+    async delete(type, id, userId) {
       const { table } = getLedgerConfig(type);
-      return db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes > 0;
+      return db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(id, userId).changes > 0;
     },
-    async summary(type) {
+    async summary(type, userId) {
       const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
       const month = today.slice(0, 7);
-      const total = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table}`).get().value;
+      const total = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE user_id = ?`).get(userId).value;
       const todayTotal = db
-        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE date = ?`)
-        .get(today).value;
+        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE user_id = ? AND date = ?`)
+        .get(userId, today).value;
       const monthTotal = db
-        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE substr(date, 1, 7) = ?`)
-        .get(month).value;
+        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE user_id = ? AND substr(date, 1, 7) = ?`)
+        .get(userId, month).value;
       const category = db
-        .prepare(`SELECT category, ROUND(SUM(amount), 2) AS amount FROM ${table} GROUP BY category ORDER BY amount DESC`)
-        .all();
+        .prepare(`SELECT category, ROUND(SUM(amount), 2) AS amount FROM ${table} WHERE user_id = ? GROUP BY category ORDER BY amount DESC`)
+        .all(userId);
       const monthly = db
         .prepare(`
           SELECT substr(date, 1, 7) AS month, ROUND(SUM(amount), 2) AS amount
           FROM ${table}
+          WHERE user_id = ?
           GROUP BY substr(date, 1, 7)
           ORDER BY month ASC
         `)
-        .all();
+        .all(userId);
 
       return {
         totals: {
@@ -194,6 +208,12 @@ async function createPostgresStore() {
 
   await Promise.all(Object.values(ledgerTypes).map((config) => pool.query(postgresCreateTableSql(config.table))));
 
+  // Add user_id column to existing tables if missing
+  await Promise.all(Object.values(ledgerTypes).map((config) => Promise.all([
+    pool.query(`ALTER TABLE ${config.table} ADD COLUMN IF NOT EXISTS user_id TEXT`),
+    pool.query(`CREATE INDEX IF NOT EXISTS idx_${config.table}_user_id ON ${config.table}(user_id)`)
+  ])));
+
   const toRows = (result) => result.rows.map((row) => ({
     ...row,
     date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date),
@@ -203,24 +223,24 @@ async function createPostgresStore() {
 
   return {
     name: "PostgreSQL",
-    async list(type) {
+    async list(type, userId) {
       const { table } = getLedgerConfig(type);
-      const result = await pool.query(`SELECT * FROM ${table} ORDER BY date DESC, id DESC`);
+      const result = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1 ORDER BY date DESC, id DESC`, [userId]);
       return toRows(result).map(mapRecord);
     },
-    async create(type, record) {
+    async create(type, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = await pool.query(
         `
-          INSERT INTO ${table} (date, amount, category, description, payment_method)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO ${table} (date, amount, category, description, payment_method, user_id)
+          VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING *
         `,
-        [record.date, record.amount, record.category, record.description, record.paymentMethod]
+        [record.date, record.amount, record.category, record.description, record.paymentMethod, userId]
       );
       return mapRecord(toRows(result)[0]);
     },
-    async update(type, id, record) {
+    async update(type, id, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = await pool.query(
         `
@@ -231,19 +251,19 @@ async function createPostgresStore() {
               description = $4,
               payment_method = $5,
               updated_at = NOW()
-          WHERE id = $6
+          WHERE id = $6 AND user_id = $7
           RETURNING *
         `,
-        [record.date, record.amount, record.category, record.description, record.paymentMethod, id]
+        [record.date, record.amount, record.category, record.description, record.paymentMethod, id, userId]
       );
       return result.rowCount === 0 ? null : mapRecord(toRows(result)[0]);
     },
-    async delete(type, id) {
+    async delete(type, id, userId) {
       const { table } = getLedgerConfig(type);
-      const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+      const result = await pool.query(`DELETE FROM ${table} WHERE id = $1 AND user_id = $2`, [id, userId]);
       return result.rowCount > 0;
     },
-    async summary(type) {
+    async summary(type, userId) {
       const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
       const month = today.slice(0, 7);
@@ -255,21 +275,30 @@ async function createPostgresStore() {
               COALESCE(SUM(amount) FILTER (WHERE date = $1::date), 0) AS today,
               COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = $2), 0) AS month
             FROM ${table}
+            WHERE user_id = $3
           `,
-          [today, month]
+          [today, month, userId]
         ),
-        pool.query(`
-          SELECT category, ROUND(SUM(amount), 2)::float AS amount
-          FROM ${table}
-          GROUP BY category
-          ORDER BY amount DESC
-        `),
-        pool.query(`
-          SELECT to_char(date, 'YYYY-MM') AS month, ROUND(SUM(amount), 2)::float AS amount
-          FROM ${table}
-          GROUP BY to_char(date, 'YYYY-MM')
-          ORDER BY month ASC
-        `)
+        pool.query(
+          `
+            SELECT category, ROUND(SUM(amount), 2)::float AS amount
+            FROM ${table}
+            WHERE user_id = $1
+            GROUP BY category
+            ORDER BY amount DESC
+          `,
+          [userId]
+        ),
+        pool.query(
+          `
+            SELECT to_char(date, 'YYYY-MM') AS month, ROUND(SUM(amount), 2)::float AS amount
+            FROM ${table}
+            WHERE user_id = $1
+            GROUP BY to_char(date, 'YYYY-MM')
+            ORDER BY month ASC
+          `,
+          [userId]
+        )
       ]);
 
       return {
@@ -302,6 +331,24 @@ function requireLedger(req, res, next) {
   next();
 }
 
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!token) {
+    res.status(401).json({ error: "יש להתחבר כדי להמשיך." });
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET, { algorithms: ["HS256"] });
+    req.userId = payload.sub;
+    next();
+  } catch {
+    res.status(401).json({ error: "הפעלה פגה תוקפה. יש להתחבר מחדש." });
+  }
+}
+
 async function main() {
   const store = databaseUrl ? await createPostgresStore() : createSqliteStore();
 
@@ -313,31 +360,38 @@ async function main() {
     res.json({ ok: true, database: store.name });
   });
 
+  app.get("/api/config", (req, res) => {
+    res.json({
+      supabaseUrl: process.env.SUPABASE_URL || "",
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ""
+    });
+  });
+
   app.get("/api/:type/categories", requireLedger, (req, res) => {
     res.json({ categories: req.ledger.categories });
   });
 
-  app.get("/api/:type", requireLedger, asyncHandler(async (req, res) => {
-    const records = await store.list(req.params.type);
+  app.get("/api/:type", requireLedger, requireAuth, asyncHandler(async (req, res) => {
+    const records = await store.list(req.params.type, req.userId);
     res.json({ [req.ledger.singular + "s"]: records, records });
   }));
 
-  app.post("/api/:type", requireLedger, asyncHandler(async (req, res) => {
+  app.post("/api/:type", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const normalized = normalizeRecord(req.body);
     if (normalized.error) {
       res.status(400).json({ error: normalized.error });
       return;
     }
 
-    const record = await store.create(req.params.type, normalized.value);
+    const record = await store.create(req.params.type, normalized.value, req.userId);
     res.status(201).json({ [req.ledger.singular]: record, record });
   }));
 
-  app.get("/api/:type/summary", requireLedger, asyncHandler(async (req, res) => {
-    res.json(await store.summary(req.params.type));
+  app.get("/api/:type/summary", requireLedger, requireAuth, asyncHandler(async (req, res) => {
+    res.json(await store.summary(req.params.type, req.userId));
   }));
 
-  app.put("/api/:type/:id", requireLedger, asyncHandler(async (req, res) => {
+  app.put("/api/:type/:id", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       res.status(400).json({ error: "מזהה הרשומה לא תקין." });
@@ -350,7 +404,7 @@ async function main() {
       return;
     }
 
-    const record = await store.update(req.params.type, id, normalized.value);
+    const record = await store.update(req.params.type, id, normalized.value, req.userId);
     if (!record) {
       res.status(404).json({ error: "הרשומה לא נמצאה." });
       return;
@@ -359,14 +413,14 @@ async function main() {
     res.json({ [req.ledger.singular]: record, record });
   }));
 
-  app.delete("/api/:type/:id", requireLedger, asyncHandler(async (req, res) => {
+  app.delete("/api/:type/:id", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       res.status(400).json({ error: "מזהה הרשומה לא תקין." });
       return;
     }
 
-    const deleted = await store.delete(req.params.type, id);
+    const deleted = await store.delete(req.params.type, id, req.userId);
     if (!deleted) {
       res.status(404).json({ error: "הרשומה לא נמצאה." });
       return;
