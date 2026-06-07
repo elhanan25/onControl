@@ -42,7 +42,7 @@ button {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
   min-height: 100vh;
-  direction: ltr;
+  direction: rtl;
 }
 
 .sidebar {
@@ -55,7 +55,6 @@ button {
   padding: 18px;
   background: var(--nav);
   color: white;
-  direction: rtl;
 }
 
 .brand {
@@ -134,7 +133,7 @@ button {
   max-width: 1180px;
   margin: 0 auto;
   padding: 22px clamp(14px, 2.5vw, 32px) 40px;
-  direction: rtl;
+  min-width: 0;
 }
 
 .topbar {
@@ -240,6 +239,11 @@ h2 {
   position: sticky;
   top: 18px;
   max-width: 100%;
+}
+
+.form-panel.editing {
+  border-color: rgba(0, 116, 129, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 116, 129, 0.1), var(--shadow);
 }
 
 label {

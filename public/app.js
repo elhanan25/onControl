@@ -103,6 +103,19 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function dateForInput(value) {
+  return String(value || "").slice(0, 10);
+}
+
+function ensureSelectValue(select, value) {
+  if (!value) return;
+  const exists = Array.from(select.options).some((option) => option.value === value);
+  if (!exists) {
+    select.add(new Option(value, value));
+  }
+  select.value = value;
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -148,22 +161,25 @@ function resetForm() {
   els.formTitle.textContent = config.newTitle;
   els.submitButton.textContent = config.saveText;
   els.cancelEdit.classList.add("hidden");
+  els.form.classList.remove("editing");
   setMessage("");
 }
 
 function startEdit(record) {
   const config = currentConfig();
   els.recordId.value = record.id;
-  els.date.value = record.date;
+  els.date.value = dateForInput(record.date);
   els.amount.value = record.amount;
-  els.category.value = record.category;
+  ensureSelectValue(els.category, record.category);
   els.description.value = record.description;
-  els.paymentMethod.value = record.paymentMethod;
+  ensureSelectValue(els.paymentMethod, record.paymentMethod);
   els.formTitle.textContent = config.editTitle;
   els.submitButton.textContent = config.updateText;
   els.cancelEdit.classList.remove("hidden");
-  setMessage("");
+  setMessage(`${config.singular} נפתחה לעריכה.`);
+  els.form.classList.add("editing");
   els.form.scrollIntoView({ behavior: "smooth", block: "start" });
+  els.amount.focus();
 }
 
 function renderRows() {
@@ -191,13 +207,23 @@ function renderRows() {
     actionsWrap.className = "actions";
     editButton.className = "small-button";
     editButton.type = "button";
+    editButton.dataset.action = "edit";
+    editButton.dataset.id = record.id;
     editButton.textContent = "ערוך";
-    editButton.addEventListener("click", () => startEdit(record));
+    editButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      startEdit(record);
+    });
 
     deleteButton.className = "danger-button";
     deleteButton.type = "button";
+    deleteButton.dataset.action = "delete";
+    deleteButton.dataset.id = record.id;
     deleteButton.textContent = "מחק";
-    deleteButton.addEventListener("click", () => deleteRecord(record));
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteRecord(record);
+    });
 
     actionsWrap.append(editButton, deleteButton);
     actionsCell.appendChild(actionsWrap);
@@ -346,6 +372,23 @@ els.form.addEventListener("submit", async (event) => {
 });
 
 els.cancelEdit.addEventListener("click", resetForm);
+
+els.recordsBody.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const id = Number(button.dataset.id);
+  const record = state.records.find((item) => Number(item.id) === id);
+  if (!record) return;
+
+  if (button.dataset.action === "edit") {
+    startEdit(record);
+  }
+
+  if (button.dataset.action === "delete") {
+    deleteRecord(record);
+  }
+});
 
 async function deleteRecord(record) {
   const config = currentConfig();
