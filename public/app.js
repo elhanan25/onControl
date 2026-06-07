@@ -174,17 +174,34 @@ function renderRows() {
 
   state.records.forEach((record) => {
     const row = document.createElement("tr");
+    const actionsCell = document.createElement("td");
+    const actionsWrap = document.createElement("div");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
+
     row.innerHTML = `
       <td>${record.date}</td>
       <td>${formatMoney(record.amount)}</td>
       <td>${record.category}</td>
       <td>${record.description || "-"}</td>
       <td>${record.paymentMethod || "-"}</td>
-      <td class="actions">
-        <button class="small-button" type="button" data-action="edit" data-id="${record.id}">ערוך</button>
-        <button class="danger-button" type="button" data-action="delete" data-id="${record.id}">מחק</button>
-      </td>
     `;
+
+    actionsCell.className = "actions-cell";
+    actionsWrap.className = "actions";
+    editButton.className = "small-button";
+    editButton.type = "button";
+    editButton.textContent = "ערוך";
+    editButton.addEventListener("click", () => startEdit(record));
+
+    deleteButton.className = "danger-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "מחק";
+    deleteButton.addEventListener("click", () => deleteRecord(record));
+
+    actionsWrap.append(editButton, deleteButton);
+    actionsCell.appendChild(actionsWrap);
+    row.appendChild(actionsCell);
     els.recordsBody.appendChild(row);
   });
 }
@@ -330,33 +347,21 @@ els.form.addEventListener("submit", async (event) => {
 
 els.cancelEdit.addEventListener("click", resetForm);
 
-els.recordsBody.addEventListener("click", async (event) => {
-  const button = event.target.closest("button[data-action]");
-  if (!button) return;
-
+async function deleteRecord(record) {
   const config = currentConfig();
-  const id = Number(button.dataset.id);
-  const record = state.records.find((item) => item.id === id);
   if (!record) return;
 
-  if (button.dataset.action === "edit") {
-    startEdit(record);
-    return;
-  }
+  const confirmed = window.confirm(config.confirmDelete);
+  if (!confirmed) return;
 
-  if (button.dataset.action === "delete") {
-    const confirmed = window.confirm(config.confirmDelete);
-    if (!confirmed) return;
-
-    try {
-      await api(`${config.api}/${id}`, { method: "DELETE" });
-      await refresh();
-      resetForm();
-    } catch (error) {
-      setMessage(error.message, true);
-    }
+  try {
+    await api(`${config.api}/${record.id}`, { method: "DELETE" });
+    await refresh();
+    resetForm();
+  } catch (error) {
+    setMessage(error.message, true);
   }
-});
+}
 
 els.navItems.forEach((item) => {
   item.addEventListener("click", () => {
