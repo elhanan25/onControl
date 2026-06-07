@@ -219,6 +219,12 @@ h2 {
   align-items: start;
 }
 
+.content-stack {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
 .panel,
 .chart-panel {
   padding: 16px;
@@ -349,12 +355,11 @@ canvas {
 }
 
 .table-panel {
-  margin-top: 18px;
   padding-bottom: 12px;
 }
 
 .table-wrap {
-  max-height: 430px;
+  height: 238px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -482,6 +487,11 @@ tbody tr:hover {
     display: block;
   }
 
+  .content-stack {
+    display: grid;
+    gap: 18px;
+  }
+
   .date-pill {
     margin-top: 16px;
     text-align: right;
@@ -495,6 +505,10 @@ tbody tr:hover {
   .form-panel {
     position: static;
     margin-bottom: 18px;
+  }
+
+  .table-wrap {
+    height: 360px;
   }
 }
 

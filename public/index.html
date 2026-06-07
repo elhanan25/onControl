@@ -7,9 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260607-table-edit-capture">
+    <link rel="stylesheet" href="styles.css?v=20260607-table-above-charts">
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
-    <script src="app.js?v=20260607-table-edit-capture" defer></script>
+    <script src="app.js?v=20260607-table-above-charts" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -95,42 +95,44 @@
             <button class="primary-button" type="submit" id="submitButton">שמור הוצאה</button>
           </form>
 
-          <section class="charts">
-            <div class="chart-panel">
+          <div class="content-stack">
+            <section class="panel table-panel">
               <div class="panel-title">
-                <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+                <h2 id="tableTitle">הוצאות אחרונות</h2>
+                <span id="recordCount"></span>
               </div>
-              <canvas id="categoryChart"></canvas>
-            </div>
-            <div class="chart-panel">
-              <div class="panel-title">
-                <h2 id="monthlyChartTitle">סיכום חודשי</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>תאריך</th>
+                      <th>סכום</th>
+                      <th>קטגוריה</th>
+                      <th>תיאור</th>
+                      <th>תשלום / מקור</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="recordsBody"></tbody>
+                </table>
+                <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
               </div>
-              <canvas id="monthlyChart"></canvas>
-            </div>
-          </section>
-        </section>
+            </section>
 
-        <section class="panel table-panel">
-          <div class="panel-title">
-            <h2 id="tableTitle">הוצאות אחרונות</h2>
-            <span id="recordCount"></span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>תאריך</th>
-                  <th>סכום</th>
-                  <th>קטגוריה</th>
-                  <th>תיאור</th>
-                  <th>תשלום / מקור</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="recordsBody"></tbody>
-            </table>
-            <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
+            <section class="charts">
+              <div class="chart-panel">
+                <div class="panel-title">
+                  <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+                </div>
+                <canvas id="categoryChart"></canvas>
+              </div>
+              <div class="chart-panel">
+                <div class="panel-title">
+                  <h2 id="monthlyChartTitle">סיכום חודשי</h2>
+                </div>
+                <canvas id="monthlyChart"></canvas>
+              </div>
+            </section>
           </div>
         </section>
       </main>
