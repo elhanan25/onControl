@@ -344,12 +344,12 @@ select:focus {
 }
 
 .chart-panel {
-  min-height: 300px;
+  min-height: 0;
 }
 
 canvas {
   width: 100%;
-  max-height: 240px;
+  max-height: 170px;
 }
 
 .table-panel {
@@ -357,7 +357,7 @@ canvas {
 }
 
 .table-wrap {
-  height: 238px;
+  max-height: 340px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -670,7 +670,7 @@ tbody tr:hover {
   }
 
   .table-wrap {
-    height: 360px;
+    max-height: 360px;
   }
 }
 
