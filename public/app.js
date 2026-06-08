@@ -323,13 +323,15 @@ function renderRows() {
     editButton.type = "button";
     editButton.dataset.action = "edit";
     editButton.dataset.id = record.id;
-    editButton.textContent = "ערוך";
+    editButton.textContent = "✎";
+    editButton.title = "ערוך";
 
     deleteButton.className = "danger-button";
     deleteButton.type = "button";
     deleteButton.dataset.action = "delete";
     deleteButton.dataset.id = record.id;
-    deleteButton.textContent = "מחק";
+    deleteButton.textContent = "×";
+    deleteButton.title = "מחק";
 
     actionsWrap.append(editButton, deleteButton);
     actionsCell.appendChild(actionsWrap);
