@@ -216,7 +216,7 @@ h2 {
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr) 210px;
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 18px;
 }
 
@@ -224,6 +224,12 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  height: 100%;
+}
+
+.charts-column .chart-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 .panel,
@@ -351,11 +357,14 @@ canvas {
 }
 
 .table-panel {
-  padding-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .table-wrap {
-  max-height: 340px;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
