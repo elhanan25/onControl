@@ -3,7 +3,7 @@ const fs = require("fs");
 const express = require("express");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
-const jwt = require("jsonwebtoken");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -331,6 +331,19 @@ function requireLedger(req, res, next) {
   next();
 }
 
+let supabaseAdmin = null;
+
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+  }
+  return supabaseAdmin;
+}
+
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -340,20 +353,18 @@ function requireAuth(req, res, next) {
     return;
   }
 
-  try {
-    const secret = process.env.SUPABASE_JWT_SECRET;
-    if (!secret) {
-      console.error("requireAuth: SUPABASE_JWT_SECRET is not set");
-      res.status(401).json({ error: "הגדרות שרת חסרות." });
+  getSupabaseAdmin().auth.getUser(token).then(({ data: { user }, error }) => {
+    if (error || !user) {
+      console.error("requireAuth: getUser failed:", error?.message);
+      res.status(401).json({ error: "הפעלה פגה תוקפה. יש להתחבר מחדש." });
       return;
     }
-    const payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
-    req.userId = payload.sub;
+    req.userId = user.id;
     next();
-  } catch (err) {
-    console.error("requireAuth: jwt verification failed:", err.message);
-    res.status(401).json({ error: "הפעלה פגה תוקפה. יש להתחבר מחדש." });
-  }
+  }).catch((err) => {
+    console.error("requireAuth: unexpected error:", err.message);
+    res.status(401).json({ error: "שגיאת שרת." });
+  });
 }
 
 async function main() {
