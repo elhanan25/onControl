@@ -11,6 +11,8 @@
   --teal: #007481;
   --gold: #b7791f;
   --red: #b42318;
+  --blue: #1d4ed8;
+  --blue-strong: #1e40af;
   --nav: #15202b;
   --nav-soft: #223140;
   --shadow: 0 16px 38px rgba(24, 33, 43, 0.1);
@@ -217,12 +219,7 @@ h2 {
   grid-template-columns: 310px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-}
-
-.content-stack {
-  display: grid;
-  gap: 18px;
-  min-width: 0;
+  margin-bottom: 18px;
 }
 
 .panel,
@@ -343,6 +340,7 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+  margin-bottom: 40px;
 }
 
 .chart-panel {
@@ -462,6 +460,83 @@ tbody tr:hover {
   font-weight: 700;
 }
 
+/* ── Edit mode button ───────────────────────────────────────────────────── */
+
+.form-panel.editing .primary-button {
+  background: var(--blue);
+}
+
+.form-panel.editing .primary-button:hover {
+  background: var(--blue-strong);
+}
+
+/* ── Export buttons ─────────────────────────────────────────────────────── */
+
+.panel-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.export-button:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+@media print {
+  .auth-overlay,
+  .sidebar,
+  .topbar,
+  .summary-grid,
+  .form-panel,
+  .charts,
+  .actions-cell,
+  .panel-title-actions {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .app-shell {
+    display: block;
+  }
+
+  .main-panel {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .table-panel {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .table-wrap {
+    height: auto;
+    overflow: visible;
+    border: none;
+  }
+
+  table {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 /* ── Auth overlay ───────────────────────────────────────────────────────── */
 
 .auth-overlay {
@@ -577,11 +652,6 @@ tbody tr:hover {
   .topbar,
   .workspace {
     display: block;
-  }
-
-  .content-stack {
-    display: grid;
-    gap: 18px;
   }
 
   .date-pill {
