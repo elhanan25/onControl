@@ -169,8 +169,8 @@ h1 {
 }
 
 h2 {
-  margin-bottom: 16px;
-  font-size: 1.08rem;
+  margin-bottom: 10px;
+  font-size: 1rem;
 }
 
 .date-pill {
@@ -202,7 +202,7 @@ h2 {
 }
 
 .metric {
-  padding: 10px 14px;
+  padding: 8px 14px;
 }
 
 .metric span {
@@ -230,13 +230,19 @@ h2 {
 .charts-column {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   height: 100%;
 }
 
 .charts-column .chart-panel {
   flex: 1;
   min-height: 0;
+  padding: 10px 12px;
+}
+
+.charts-column .panel-title h2 {
+  font-size: 0.85rem;
+  margin-bottom: 6px;
 }
 
 .panel,
@@ -372,6 +378,7 @@ canvas {
 .table-wrap {
   flex: 1;
   min-height: 0;
+  max-height: 38vh;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
