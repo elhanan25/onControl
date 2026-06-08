@@ -527,11 +527,13 @@ async function init() {
 // ── Spinner ──────────────────────────────────────────────────────────────────
 
 function showSpinner() {
-  document.getElementById("spinnerOverlay").classList.remove("hidden");
+  const el = document.getElementById("spinnerOverlay");
+  if (el) el.style.display = "grid";
 }
 
 function hideSpinner() {
-  document.getElementById("spinnerOverlay").classList.add("hidden");
+  const el = document.getElementById("spinnerOverlay");
+  if (el) el.style.display = "none";
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────
