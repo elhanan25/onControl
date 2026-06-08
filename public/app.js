@@ -432,14 +432,18 @@ async function loadCategories() {
 
 async function refresh() {
   const config = currentConfig();
-  const [records, summary] = await Promise.all([
-    api(config.api),
-    api(`${config.api}/summary`)
-  ]);
-
-  state.records = records.records;
-  renderRows();
-  renderSummary(summary);
+  showSpinner();
+  try {
+    const [records, summary] = await Promise.all([
+      api(config.api),
+      api(`${config.api}/summary`)
+    ]);
+    state.records = records.records;
+    renderRows();
+    renderSummary(summary);
+  } finally {
+    hideSpinner();
+  }
 }
 
 async function switchPage(page) {
@@ -518,6 +522,16 @@ async function init() {
   await loadCategories();
   resetForm();
   await refresh();
+}
+
+// ── Spinner ──────────────────────────────────────────────────────────────────
+
+function showSpinner() {
+  document.getElementById("spinnerOverlay").classList.remove("hidden");
+}
+
+function hideSpinner() {
+  document.getElementById("spinnerOverlay").classList.add("hidden");
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────

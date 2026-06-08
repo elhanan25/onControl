@@ -7,11 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260608-layout10">
+    <link rel="stylesheet" href="styles.css?v=20260608-spinner">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
-    <script src="app.js?v=20260608-layout4" defer></script>
+    <script src="app.js?v=20260608-spinner" defer></script>
   </head>
   <body>
 
@@ -98,6 +98,9 @@
         </section>
 
         <section class="workspace">
+          <div class="spinner-overlay hidden" id="spinnerOverlay">
+            <div class="spinner"></div>
+          </div>
           <form id="recordForm" class="panel form-panel">
             <input type="hidden" id="recordId">
             <div class="panel-title">
