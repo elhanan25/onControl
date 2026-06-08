@@ -341,10 +341,17 @@ function requireAuth(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET, { algorithms: ["HS256"] });
+    const secret = process.env.SUPABASE_JWT_SECRET;
+    if (!secret) {
+      console.error("requireAuth: SUPABASE_JWT_SECRET is not set");
+      res.status(401).json({ error: "הגדרות שרת חסרות." });
+      return;
+    }
+    const payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
     req.userId = payload.sub;
     next();
-  } catch {
+  } catch (err) {
+    console.error("requireAuth: jwt verification failed:", err.message);
     res.status(401).json({ error: "הפעלה פגה תוקפה. יש להתחבר מחדש." });
   }
 }
