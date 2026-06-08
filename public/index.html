@@ -7,10 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260607-auth">
+    <link rel="stylesheet" href="styles.css?v=20260608-export">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
-    <script src="app.js?v=20260607-auth" defer></script>
+    <script src="app.js?v=20260608-export" defer></script>
   </head>
   <body>
 
@@ -133,42 +134,46 @@
             <button class="primary-button" type="submit" id="submitButton">שמור הוצאה</button>
           </form>
 
-          <section class="charts">
-            <div class="chart-panel">
-              <div class="panel-title">
-                <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+          <section class="panel table-panel">
+            <div class="panel-title">
+              <h2 id="tableTitle">הוצאות אחרונות</h2>
+              <div class="panel-title-actions">
+                <span id="recordCount"></span>
+                <button class="export-button" type="button" id="exportExcel">אקסל ↓</button>
+                <button class="export-button" type="button" id="exportPdf">PDF ↓</button>
               </div>
-              <canvas id="categoryChart"></canvas>
             </div>
-            <div class="chart-panel">
-              <div class="panel-title">
-                <h2 id="monthlyChartTitle">סיכום חודשי</h2>
-              </div>
-              <canvas id="monthlyChart"></canvas>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>תאריך</th>
+                    <th>סכום</th>
+                    <th>קטגוריה</th>
+                    <th>תיאור</th>
+                    <th>תשלום / מקור</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="recordsBody"></tbody>
+              </table>
+              <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
             </div>
           </section>
         </section>
 
-        <section class="panel table-panel">
-          <div class="panel-title">
-            <h2 id="tableTitle">הוצאות אחרונות</h2>
-            <span id="recordCount"></span>
+        <section class="charts">
+          <div class="chart-panel">
+            <div class="panel-title">
+              <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+            </div>
+            <canvas id="categoryChart"></canvas>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>תאריך</th>
-                  <th>סכום</th>
-                  <th>קטגוריה</th>
-                  <th>תיאור</th>
-                  <th>תשלום / מקור</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="recordsBody"></tbody>
-            </table>
-            <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
+          <div class="chart-panel">
+            <div class="panel-title">
+              <h2 id="monthlyChartTitle">סיכום חודשי</h2>
+            </div>
+            <canvas id="monthlyChart"></canvas>
           </div>
         </section>
       </main>

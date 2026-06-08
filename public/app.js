@@ -469,6 +469,30 @@ async function init() {
   await refresh();
 }
 
+// ── Export ───────────────────────────────────────────────────────────────────
+
+function exportToExcel() {
+  const config = currentConfig();
+  const rows = state.records.map((r) => ({
+    תאריך: r.date,
+    סכום: r.amount,
+    קטגוריה: r.category,
+    תיאור: r.description || "",
+    "תשלום / מקור": r.paymentMethod || ""
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, config.plural);
+  XLSX.writeFile(wb, `${config.plural}.xlsx`);
+}
+
+function exportToPdf() {
+  window.print();
+}
+
+document.getElementById("exportExcel").addEventListener("click", exportToExcel);
+document.getElementById("exportPdf").addEventListener("click", exportToPdf);
+
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
 (async () => {
