@@ -216,7 +216,7 @@ h2 {
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr) 210px;
   gap: 14px;
-  align-items: stretch;
+  align-items: start;
   margin-bottom: 18px;
 }
 
@@ -224,18 +224,6 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  height: 100%;
-}
-
-.charts-column .chart-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.charts-column canvas {
-  flex: 1;
-  max-height: none;
 }
 
 .panel,
@@ -363,12 +351,11 @@ canvas {
 }
 
 .table-panel {
-  display: flex;
-  flex-direction: column;
+  padding-bottom: 12px;
 }
 
 .table-wrap {
-  flex: 1;
+  max-height: 340px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
