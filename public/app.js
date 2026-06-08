@@ -130,10 +130,13 @@ const pageConfig = {
   }
 };
 
+const PAGE_SIZE = 20;
+
 const state = {
   activePage: "expenses",
   records: [],
-  charts: {}
+  charts: {},
+  currentPage: 1
 };
 
 const els = {
@@ -163,7 +166,11 @@ const els = {
   tableTitle: document.querySelector("#tableTitle"),
   recordsBody: document.querySelector("#recordsBody"),
   emptyState: document.querySelector("#emptyState"),
-  recordCount: document.querySelector("#recordCount")
+  recordCount: document.querySelector("#recordCount"),
+  pagination: document.querySelector("#pagination"),
+  pageInfo: document.querySelector("#pageInfo"),
+  prevPage: document.querySelector("#prevPage"),
+  nextPage: document.querySelector("#nextPage")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -298,11 +305,25 @@ function handleRecordAction(action, id) {
 
 function renderRows() {
   const config = currentConfig();
-  els.recordsBody.innerHTML = "";
-  els.emptyState.classList.toggle("visible", state.records.length === 0);
-  els.recordCount.textContent = `${state.records.length} ${config.plural}`;
+  const total = state.records.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  state.currentPage = Math.min(state.currentPage, totalPages);
+  const start = (state.currentPage - 1) * PAGE_SIZE;
+  const pageRecords = state.records.slice(start, start + PAGE_SIZE);
 
-  state.records.forEach((record) => {
+  els.recordsBody.innerHTML = "";
+  els.emptyState.classList.toggle("visible", total === 0);
+  els.recordCount.textContent = `${total} ${config.plural}`;
+
+  const showPagination = total > PAGE_SIZE;
+  els.pagination.style.display = showPagination ? "flex" : "none";
+  if (showPagination) {
+    els.pageInfo.textContent = `עמוד ${state.currentPage} מתוך ${totalPages}`;
+    els.prevPage.disabled = state.currentPage === 1;
+    els.nextPage.disabled = state.currentPage === totalPages;
+  }
+
+  pageRecords.forEach((record) => {
     const row = document.createElement("tr");
     const actionsCell = document.createElement("td");
     const actionsWrap = document.createElement("div");
@@ -430,8 +451,9 @@ async function loadCategories() {
   fillSelect(els.paymentMethod, config.methods);
 }
 
-async function refresh() {
+async function refresh(resetPage = true) {
   const config = currentConfig();
+  if (resetPage) state.currentPage = 1;
   showSpinner();
   try {
     const [records, summary] = await Promise.all([
@@ -477,7 +499,7 @@ els.form.addEventListener("submit", async (event) => {
     }
 
     resetForm();
-    await refresh();
+    await refresh(false);
   } catch (error) {
     setMessage(error.message, true);
   }
@@ -514,6 +536,21 @@ els.navItems.forEach((item) => {
   item.addEventListener("click", () => {
     switchPage(item.dataset.page).catch((error) => setMessage(error.message, true));
   });
+});
+
+els.prevPage.addEventListener("click", () => {
+  if (state.currentPage > 1) {
+    state.currentPage--;
+    renderRows();
+  }
+});
+
+els.nextPage.addEventListener("click", () => {
+  const totalPages = Math.ceil(state.records.length / PAGE_SIZE);
+  if (state.currentPage < totalPages) {
+    state.currentPage++;
+    renderRows();
+  }
 });
 
 async function init() {

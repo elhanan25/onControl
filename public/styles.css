@@ -480,6 +480,40 @@ tbody tr:hover {
   font-weight: 700;
 }
 
+/* ── Pagination ─────────────────────────────────────────────────────────── */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.page-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 1.1rem;
+  display: grid;
+  place-items: center;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--line);
+}
+
+.page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* ── Spinner ────────────────────────────────────────────────────────────── */
 
 .spinner-overlay {
