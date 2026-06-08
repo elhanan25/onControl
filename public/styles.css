@@ -132,8 +132,12 @@ button {
 
 .main-panel {
   width: 100%;
-  padding: 20px 24px 40px;
+  height: 100vh;
+  padding: 14px 20px 14px;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -141,7 +145,8 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .eyebrow {
@@ -159,7 +164,7 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 3.2vw, 3rem);
+  font-size: clamp(1.5rem, 2.2vw, 2.2rem);
   letter-spacing: 0;
 }
 
@@ -182,8 +187,9 @@ h2 {
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
 }
 
 .metric,
@@ -196,8 +202,7 @@ h2 {
 }
 
 .metric {
-  min-height: 104px;
-  padding: 16px;
+  padding: 10px 14px;
 }
 
 .metric span {
@@ -217,7 +222,9 @@ h2 {
   grid-template-columns: 270px minmax(0, 1fr) 210px;
   gap: 14px;
   align-items: stretch;
-  margin-bottom: 18px;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
 }
 
 .charts-column {
