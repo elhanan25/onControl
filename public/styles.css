@@ -214,10 +214,16 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: 310px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 270px minmax(0, 1fr) 210px;
+  gap: 14px;
   align-items: start;
   margin-bottom: 18px;
+}
+
+.charts-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .panel,
@@ -334,12 +340,6 @@ select:focus {
   color: var(--red);
 }
 
-.charts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 40px;
-}
 
 .chart-panel {
   min-height: 0;
@@ -497,7 +497,7 @@ tbody tr:hover {
   .topbar,
   .summary-grid,
   .form-panel,
-  .charts,
+  .charts-column,
   .actions-cell,
   .panel-title-actions {
     display: none !important;
@@ -656,8 +656,7 @@ tbody tr:hover {
     text-align: right;
   }
 
-  .summary-grid,
-  .charts {
+  .summary-grid {
     grid-template-columns: 1fr;
   }
 

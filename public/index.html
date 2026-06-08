@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260608-layout4">
+    <link rel="stylesheet" href="styles.css?v=20260608-layout5">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
@@ -160,20 +160,20 @@
               <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
             </div>
           </section>
-        </section>
 
-        <section class="charts">
-          <div class="chart-panel">
-            <div class="panel-title">
-              <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+          <div class="charts-column">
+            <div class="chart-panel">
+              <div class="panel-title">
+                <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+              </div>
+              <canvas id="categoryChart"></canvas>
             </div>
-            <canvas id="categoryChart"></canvas>
-          </div>
-          <div class="chart-panel">
-            <div class="panel-title">
-              <h2 id="monthlyChartTitle">סיכום חודשי</h2>
+            <div class="chart-panel">
+              <div class="panel-title">
+                <h2 id="monthlyChartTitle">סיכום חודשי</h2>
+              </div>
+              <canvas id="monthlyChart"></canvas>
             </div>
-            <canvas id="monthlyChart"></canvas>
           </div>
         </section>
       </main>
