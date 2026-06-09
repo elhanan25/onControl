@@ -375,6 +375,7 @@ function upsertChart(key, canvasId, type, labels, values, label) {
     state.charts[key].destroy();
   }
 
+  const isDoughnut = type === "doughnut";
   state.charts[key] = new Chart(context, {
     type,
     data: {
@@ -383,22 +384,65 @@ function upsertChart(key, canvasId, type, labels, values, label) {
         {
           label,
           data: values,
-          borderColor: config.colors.main,
-          backgroundColor: type === "doughnut" ? chartColors(values.length) : config.colors.fill,
-          borderWidth: 2,
-          borderRadius: type === "bar" ? 8 : 0,
+          borderColor: isDoughnut ? "transparent" : config.colors.main,
+          backgroundColor: isDoughnut ? chartColors(values.length) : config.colors.fill,
+          borderWidth: isDoughnut ? 0 : 2,
+          borderRadius: type === "bar" ? 6 : 0,
           tension: 0.35,
-          fill: false
+          fill: false,
+          hoverOffset: isDoughnut ? 8 : 0
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 4, bottom: 4 } },
       plugins: {
-        legend: { display: type === "doughnut", position: "bottom" }
+        legend: isDoughnut ? {
+          display: true,
+          position: "bottom",
+          labels: {
+            boxWidth: 10,
+            boxHeight: 10,
+            borderRadius: 3,
+            useBorderRadius: true,
+            padding: 10,
+            font: { size: 11, family: "'Assistant', Arial, sans-serif" },
+            color: "#667085"
+          }
+        } : { display: false },
+        tooltip: {
+          backgroundColor: "#18212b",
+          titleColor: "#ffffff",
+          bodyColor: "#d9e1e8",
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: {
+            label: (ctx) => ` ${formatMoney(ctx.parsed.y ?? ctx.parsed)}`
+          }
+        }
       },
-      scales: type === "doughnut" ? {} : { y: { beginAtZero: true } }
+      scales: isDoughnut ? {} : {
+        y: {
+          beginAtZero: true,
+          grid: { color: "#eef2f6", drawBorder: false },
+          ticks: {
+            font: { size: 10, family: "'Assistant', Arial, sans-serif" },
+            color: "#667085",
+            callback: (v) => formatMoney(v)
+          },
+          border: { display: false }
+        },
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 10, family: "'Assistant', Arial, sans-serif" },
+            color: "#667085"
+          },
+          border: { display: false }
+        }
+      }
     }
   });
 }

@@ -230,19 +230,35 @@ h2 {
 .charts-column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   height: 100%;
 }
 
 .charts-column .chart-panel {
   flex: 1;
   min-height: 0;
-  padding: 10px 12px;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.charts-column .chart-panel canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100% !important;
+}
+
+.charts-column .panel-title {
+  margin-bottom: 10px;
 }
 
 .charts-column .panel-title h2 {
-  font-size: 0.85rem;
-  margin-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0;
 }
 
 .panel,
