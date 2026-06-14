@@ -49,6 +49,9 @@ const state = {
   charts: {}
 };
 
+const PAGE_SIZE = 25;
+let currentPage = 1;
+
 const els = {
   navItems: document.querySelectorAll(".nav-item"),
   pageEyebrow: document.querySelector("#pageEyebrow"),
@@ -201,11 +204,18 @@ function handleRecordAction(action, id) {
 
 function renderRows() {
   const config = currentConfig();
-  els.recordsBody.innerHTML = "";
-  els.emptyState.classList.toggle("visible", state.records.length === 0);
-  els.recordCount.textContent = `${state.records.length} ${config.plural}`;
+  const total = state.records.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
 
-  state.records.forEach((record) => {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageRecords = state.records.slice(start, start + PAGE_SIZE);
+
+  els.recordsBody.innerHTML = "";
+  els.emptyState.classList.toggle("visible", total === 0);
+  els.recordCount.textContent = `${total} ${config.plural}`;
+
+  pageRecords.forEach((record) => {
     const row = document.createElement("tr");
     const actionsCell = document.createElement("td");
     const actionsWrap = document.createElement("div");
@@ -238,6 +248,34 @@ function renderRows() {
     actionsCell.appendChild(actionsWrap);
     row.appendChild(actionsCell);
     els.recordsBody.appendChild(row);
+  });
+
+  renderPagination(total);
+}
+
+function renderPagination(total) {
+  const pagination = document.querySelector("#pagination");
+  if (!pagination) return;
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) {
+    pagination.innerHTML = "";
+    return;
+  }
+
+  pagination.innerHTML = `
+    <button class="page-btn" id="prevPage" ${currentPage <= 1 ? "disabled" : ""}>›</button>
+    <span>עמוד ${currentPage} מתוך ${totalPages}</span>
+    <button class="page-btn" id="nextPage" ${currentPage >= totalPages ? "disabled" : ""}>‹</button>
+  `;
+
+  pagination.querySelector("#prevPage").addEventListener("click", () => {
+    currentPage--;
+    renderRows();
+  });
+  pagination.querySelector("#nextPage").addEventListener("click", () => {
+    currentPage++;
+    renderRows();
   });
 }
 
@@ -339,6 +377,7 @@ async function refresh() {
   ]);
 
   state.records = records.records;
+  currentPage = 1;
   renderRows();
   renderSummary(summary);
 }
@@ -413,6 +452,40 @@ els.navItems.forEach((item) => {
   });
 });
 
+function extractField(row, ...keys) {
+  for (const key of keys) {
+    const val = row[key];
+    if (val !== undefined && val !== null && String(val).trim() !== "") {
+      return val;
+    }
+  }
+  return "";
+}
+
+function parseIsraeliDate(val) {
+  if (!val && val !== 0) return "";
+  if (typeof val === "number" && val > 40000 && val < 60000) {
+    const d = new Date(Math.round((val - 25569) * 86400000));
+    return d.toISOString().slice(0, 10);
+  }
+  const s = String(val).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if (m) {
+    const year = m[3].length === 2 ? "20" + m[3] : m[3];
+    return `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+  return s.slice(0, 10);
+}
+
+function parseAmount(val) {
+  if (!val && val !== 0) return 0;
+  const s = String(val).replace(/[,\s₪"']/g, "");
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : Math.abs(n);
+}
+
 // Excel Import Handler
 async function handleExcelUpload(file) {
   const config = currentConfig();
@@ -427,31 +500,50 @@ async function handleExcelUpload(file) {
   importMessage.textContent = "קורא קובץ...";
 
   try {
-    // Parse Excel file
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: "array" });
-    
+
     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
       throw new Error("הקובץ לא מכיל דפים");
     }
 
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(firstSheet);
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 
     if (rows.length === 0) {
       throw new Error("הקובץ ריק - לא נמצאו רשומות");
     }
 
-    // Prepare records with normalized field names
-    const records = rows.map((row) => ({
-      date: String(row.date || row.Date || row.תאריך || "").trim(),
-      amount: Number(row.amount || row.Amount || row.סכום || 0),
-      category: String(row.category || row.Category || row.קטגוריה || "").trim(),
-      description: String(row.description || row.Description || row.תיאור || "").trim(),
-      paymentMethod: String(row.paymentMethod || row.payment_method || row.PaymentMethod || row.Payment_Method || row["אמצעי תשלום"] || "").trim()
+    const allRecords = rows.map((row) => ({
+      date: parseIsraeliDate(extractField(row,
+        "date", "Date", "תאריך", "תאריך עסקה", "תאריך רכישה", "תאריך חיוב", "תאריך ערך", "תאריך פעולה"
+      )),
+      amount: parseAmount(extractField(row,
+        "amount", "Amount", "סכום", "סכום עסקה", "סכום חיוב", "סכום חיוב בש''ח", "סכום חיוב בשח",
+        "חיוב", "סכום בש''ח", "סכום בשח", "original_amount", "סכום מקורי", "סכום ₪", "סכום הוצאה"
+      )),
+      category: String(extractField(row,
+        "category", "Category", "קטגוריה", "ענף", "סוג עסקה", "תחום"
+      )).trim() || "אחר",
+      description: String(extractField(row,
+        "description", "Description", "תיאור", "שם בית עסק", "שם בית העסק", "שם עסק",
+        "מוטב", "פרטים", "merchant_name", "שם המוטב", "בית עסק", "שם"
+      )).trim(),
+      paymentMethod: String(extractField(row,
+        "paymentMethod", "payment_method", "PaymentMethod", "אמצעי תשלום",
+        "כרטיס", "סוג כרטיס", "סוג אשראי", "אמצעי"
+      )).trim() || "אשראי"
     }));
 
-    importMessage.textContent = `שולח ${records.length} רשומות לשרת...`;
+    const records = allRecords.filter((r) => r.date && r.amount > 0);
+
+    if (records.length === 0) {
+      const sampleKeys = Object.keys(rows[0] || {}).slice(0, 8).join(", ");
+      throw new Error(`לא נמצאו שורות תקינות. כותרות שזוהו: ${sampleKeys}`);
+    }
+
+    const skipped = allRecords.length - records.length;
+    importMessage.textContent = `נמצאו ${records.length} שורות תקינות${skipped ? ` (${skipped} דולגו - ללא תאריך/סכום)` : ""}. שולח לשרת...`;
 
     // Send to server
     const response = await api(`${config.api}/import`, {
