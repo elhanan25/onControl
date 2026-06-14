@@ -47,7 +47,8 @@ const state = {
   activePage: "expenses",
   records: [],
   charts: {},
-  filterMonth: ""
+  filterMonth: "",
+  lastSummary: null
 };
 
 const PAGE_SIZE = 25;
@@ -332,7 +333,27 @@ function upsertChart(key, canvasId, type, labels, values, label) {
   });
 }
 
+function updateSummaryForFilter() {
+  const config = currentConfig();
+  if (!state.lastSummary) return;
+
+  if (!state.filterMonth) {
+    els.allTotal.textContent = formatMoney(state.lastSummary.totals.total);
+    els.allMetricLabel.textContent = `סה״כ ${config.plural}`;
+    return;
+  }
+
+  const filteredTotal = filteredRecords().reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const [year, month] = state.filterMonth.split("-");
+  const monthLabel = new Date(Number(year), Number(month) - 1, 1)
+    .toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+
+  els.allTotal.textContent = formatMoney(filteredTotal);
+  els.allMetricLabel.textContent = monthLabel;
+}
+
 function renderSummary(summary) {
+  state.lastSummary = summary;
   const config = currentConfig();
   els.todayTotal.textContent = formatMoney(summary.totals.today);
   els.monthTotal.textContent = formatMoney(summary.totals.month);
@@ -645,6 +666,7 @@ els.monthFilter.addEventListener("change", () => {
   els.clearFilter.classList.toggle("hidden", !state.filterMonth);
   currentPage = 1;
   renderRows();
+  updateSummaryForFilter();
 });
 
 els.clearFilter.addEventListener("click", () => {
@@ -653,6 +675,7 @@ els.clearFilter.addEventListener("click", () => {
   els.clearFilter.classList.add("hidden");
   currentPage = 1;
   renderRows();
+  updateSummaryForFilter();
 });
 
 async function init() {
