@@ -508,7 +508,24 @@ async function handleExcelUpload(file) {
     }
 
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+    // Scan first 25 rows to find the actual header row (Israeli bank files have preamble rows)
+    const DATE_HINTS = ["date", "תאריך", "תאריך עסקה", "תאריך רכישה", "תאריך חיוב", "תאריך ערך"];
+    const AMOUNT_HINTS = ["amount", "סכום", "סכום עסקה", "סכום חיוב", "חיוב", "סכום חיוב בשח"];
+    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
+
+    let headerRowIndex = 0;
+    for (let i = 0; i < Math.min(rawRows.length, 25); i++) {
+      const cells = rawRows[i].map((c) => String(c).trim().toLowerCase());
+      const hasDate = DATE_HINTS.some((h) => cells.includes(h.toLowerCase()));
+      const hasAmount = AMOUNT_HINTS.some((h) => cells.includes(h.toLowerCase()));
+      if (hasDate || hasAmount) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "", range: headerRowIndex });
 
     if (rows.length === 0) {
       throw new Error("הקובץ ריק - לא נמצאו רשומות");
