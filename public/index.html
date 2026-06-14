@@ -7,43 +7,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260609-charts">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=20260607-table-above-charts">
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
-    <script src="app.js?v=20260609-charts" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="app.js?v=20260607-table-above-charts" defer></script>
   </head>
   <body>
-
-    <!-- Login screen -->
-    <div id="authOverlay" class="auth-overlay">
-      <div class="auth-card">
-        <div class="auth-brand">
-          <span class="brand-mark">₪</span>
-          <div>
-            <strong>ניהול כספים</strong>
-            <span>מעקב אישי</span>
-          </div>
-        </div>
-        <h2 id="authTitle">כניסה לחשבון</h2>
-        <form id="authForm" novalidate>
-          <label>
-            דוא״ל
-            <input id="authEmail" type="email" required placeholder="you@example.com" autocomplete="email">
-          </label>
-          <label>
-            סיסמה
-            <input id="authPassword" type="password" required placeholder="••••••••" autocomplete="current-password" minlength="6">
-          </label>
-          <p class="form-message" id="authMessage" role="status"></p>
-          <button class="primary-button" type="submit" id="authSubmit">כניסה</button>
-        </form>
-        <button class="link-button" type="button" id="authToggle">אין לך חשבון? הרשמה</button>
-      </div>
-    </div>
-
-    <!-- Main app -->
-    <div class="app-shell hidden" id="appShell">
+    <div class="app-shell">
       <aside class="sidebar" aria-label="ניווט ראשי">
         <div class="brand">
           <span class="brand-mark">₪</span>
@@ -63,14 +33,6 @@
             <span>הכנסות</span>
           </button>
         </nav>
-
-        <div class="sidebar-footer">
-          <span id="userEmail" class="user-email"></span>
-          <button class="nav-item logout-button" type="button" id="logoutButton">
-            <span class="nav-icon">↩</span>
-            <span>יציאה</span>
-          </button>
-        </div>
       </aside>
 
       <main class="main-panel">
@@ -98,9 +60,6 @@
         </section>
 
         <section class="workspace">
-          <div class="spinner-overlay hidden" id="spinnerOverlay">
-            <div class="spinner"></div>
-          </div>
           <form id="recordForm" class="panel form-panel">
             <input type="hidden" id="recordId">
             <div class="panel-title">
@@ -137,55 +96,64 @@
             <button class="primary-button" type="submit" id="submitButton">שמור הוצאה</button>
           </form>
 
-          <section class="panel table-panel">
+          <div class="panel import-panel">
             <div class="panel-title">
-              <h2 id="tableTitle">הוצאות אחרונות</h2>
-              <div class="panel-title-actions">
-                <span id="recordCount"></span>
-                <button class="export-button" type="button" id="exportExcel">אקסל ↓</button>
-                <button class="export-button" type="button" id="exportPdf">PDF ↓</button>
+              <h2>יבוא מ-Excel</h2>
+            </div>
+            <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">יבא קובץ Excel עם נתונים. עמודות נדרשות: date, amount, category, description, paymentMethod</p>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="flex: 1; min-width: 200px;">
+              <button class="primary-button" type="button" id="uploadExcelButton">יבא</button>
+            </div>
+            <div id="importProgress" style="display: none; margin-top: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div id="importProgressBar" style="flex: 1; height: 8px; background: #ddd; border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; background: #146c43; width: 0%; transition: width 0.3s;" id="importProgressFill"></div>
+                </div>
+                <span id="importProgressText" style="font-size: 0.85rem;">0%</span>
               </div>
+              <p id="importMessage" style="font-size: 0.9rem;"></p>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>תאריך</th>
-                    <th>סכום</th>
-                    <th>קטגוריה</th>
-                    <th>תיאור</th>
-                    <th>תשלום / מקור</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="recordsBody"></tbody>
-              </table>
-              <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
-            </div>
-            <div class="pagination" id="pagination" style="display:none">
-              <button class="page-btn" type="button" id="nextPage">›</button>
-              <span id="pageInfo"></span>
-              <button class="page-btn" type="button" id="prevPage">‹</button>
-            </div>
-          </section>
+          </div>
 
-          <div class="charts-column">
-            <div class="chart-panel">
+          <div class="content-stack">
+            <section class="panel table-panel">
               <div class="panel-title">
-                <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+                <h2 id="tableTitle">הוצאות אחרונות</h2>
+                <span id="recordCount"></span>
               </div>
-              <div class="chart-canvas-wrapper">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>תאריך</th>
+                      <th>סכום</th>
+                      <th>קטגוריה</th>
+                      <th>תיאור</th>
+                      <th>תשלום / מקור</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="recordsBody"></tbody>
+                </table>
+                <p class="empty-state" id="emptyState">עדיין אין נתונים בעמוד הזה.</p>
+              </div>
+            </section>
+
+            <section class="charts">
+              <div class="chart-panel">
+                <div class="panel-title">
+                  <h2 id="categoryChartTitle">לפי קטגוריה</h2>
+                </div>
                 <canvas id="categoryChart"></canvas>
               </div>
-            </div>
-            <div class="chart-panel">
-              <div class="panel-title">
-                <h2 id="monthlyChartTitle">סיכום חודשי</h2>
-              </div>
-              <div class="chart-canvas-wrapper">
+              <div class="chart-panel">
+                <div class="panel-title">
+                  <h2 id="monthlyChartTitle">סיכום חודשי</h2>
+                </div>
                 <canvas id="monthlyChart"></canvas>
               </div>
-            </div>
+            </section>
           </div>
         </section>
       </main>

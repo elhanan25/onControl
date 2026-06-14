@@ -1,90 +1,3 @@
-// ── Auth ────────────────────────────────────────────────────────────────────
-
-let supabaseClient = null;
-let currentSession = null;
-
-async function initSupabase() {
-  const config = await fetch("/api/config").then((r) => r.json());
-  supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  return session;
-}
-
-function showAuthOverlay() {
-  document.getElementById("authOverlay").classList.add("visible");
-  document.getElementById("appShell").classList.add("hidden");
-}
-
-function hideAuthOverlay() {
-  document.getElementById("authOverlay").classList.remove("visible");
-  document.getElementById("appShell").classList.remove("hidden");
-}
-
-function setAuthMessage(msg, isError = false) {
-  const el = document.getElementById("authMessage");
-  el.textContent = msg;
-  el.classList.toggle("error", isError);
-}
-
-let authMode = "login";
-
-document.getElementById("authToggle").addEventListener("click", () => {
-  authMode = authMode === "login" ? "signup" : "login";
-  const isLogin = authMode === "login";
-  document.getElementById("authTitle").textContent = isLogin ? "כניסה לחשבון" : "יצירת חשבון";
-  document.getElementById("authSubmit").textContent = isLogin ? "כניסה" : "הרשמה";
-  document.getElementById("authToggle").textContent = isLogin
-    ? "אין לך חשבון? הרשמה"
-    : "יש לך חשבון? כניסה";
-  setAuthMessage("");
-});
-
-document.getElementById("authForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = document.getElementById("authEmail").value;
-  const password = document.getElementById("authPassword").value;
-  const submitBtn = document.getElementById("authSubmit");
-  submitBtn.disabled = true;
-  setAuthMessage(authMode === "login" ? "מתחבר..." : "יוצר חשבון...");
-
-  const { data, error } = authMode === "login"
-    ? await supabaseClient.auth.signInWithPassword({ email, password })
-    : await supabaseClient.auth.signUp({ email, password });
-
-  submitBtn.disabled = false;
-
-  if (error) {
-    setAuthMessage(translateAuthError(error.message), true);
-    return;
-  }
-
-  if (authMode === "signup" && !data.session) {
-    setAuthMessage("נשלח אימייל אישור. יש לאמת את הכתובת לפני הכניסה.");
-    return;
-  }
-
-  currentSession = data.session;
-  document.getElementById("userEmail").textContent = data.user.email;
-  hideAuthOverlay();
-  await init();
-});
-
-document.getElementById("logoutButton").addEventListener("click", async () => {
-  await supabaseClient.auth.signOut();
-  currentSession = null;
-  showAuthOverlay();
-});
-
-function translateAuthError(msg) {
-  if (msg.includes("Invalid login credentials")) return "כתובת דוא״ל או סיסמה שגויים.";
-  if (msg.includes("Email not confirmed")) return "יש לאמת את כתובת הדוא״ל תחילה.";
-  if (msg.includes("User already registered")) return "כתובת הדוא״ל כבר רשומה.";
-  if (msg.includes("Password should be at least")) return "הסיסמה חייבת להכיל לפחות 6 תווים.";
-  return msg;
-}
-
-// ── App config ───────────────────────────────────────────────────────────────
-
 const pageConfig = {
   expenses: {
     api: "/api/expenses",
@@ -130,17 +43,14 @@ const pageConfig = {
   }
 };
 
-const PAGE_SIZE = 20;
-
 const state = {
   activePage: "expenses",
   records: [],
-  charts: {},
-  currentPage: 1
+  charts: {}
 };
 
 const els = {
-  navItems: document.querySelectorAll(".nav-item[data-page]"),
+  navItems: document.querySelectorAll(".nav-item"),
   pageEyebrow: document.querySelector("#pageEyebrow"),
   pageTitle: document.querySelector("#pageTitle"),
   form: document.querySelector("#recordForm"),
@@ -166,11 +76,7 @@ const els = {
   tableTitle: document.querySelector("#tableTitle"),
   recordsBody: document.querySelector("#recordsBody"),
   emptyState: document.querySelector("#emptyState"),
-  recordCount: document.querySelector("#recordCount"),
-  pagination: document.querySelector("#pagination"),
-  pageInfo: document.querySelector("#pageInfo"),
-  prevPage: document.querySelector("#prevPage"),
-  nextPage: document.querySelector("#nextPage")
+  recordCount: document.querySelector("#recordCount")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -211,20 +117,10 @@ function ensureSelectValue(select, value) {
 }
 
 async function api(path, options = {}) {
-  const token = currentSession?.access_token;
   const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    },
+    headers: { "Content-Type": "application/json" },
     ...options
   });
-
-  if (response.status === 401) {
-    currentSession = null;
-    showAuthOverlay();
-    throw new Error("הפעלה פגה תוקפה. יש להתחבר מחדש.");
-  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -305,25 +201,11 @@ function handleRecordAction(action, id) {
 
 function renderRows() {
   const config = currentConfig();
-  const total = state.records.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  state.currentPage = Math.min(state.currentPage, totalPages);
-  const start = (state.currentPage - 1) * PAGE_SIZE;
-  const pageRecords = state.records.slice(start, start + PAGE_SIZE);
-
   els.recordsBody.innerHTML = "";
-  els.emptyState.classList.toggle("visible", total === 0);
-  els.recordCount.textContent = `${total} ${config.plural}`;
+  els.emptyState.classList.toggle("visible", state.records.length === 0);
+  els.recordCount.textContent = `${state.records.length} ${config.plural}`;
 
-  const showPagination = total > PAGE_SIZE;
-  els.pagination.style.display = showPagination ? "flex" : "none";
-  if (showPagination) {
-    els.pageInfo.textContent = `עמוד ${state.currentPage} מתוך ${totalPages}`;
-    els.prevPage.disabled = state.currentPage === 1;
-    els.nextPage.disabled = state.currentPage === totalPages;
-  }
-
-  pageRecords.forEach((record) => {
+  state.records.forEach((record) => {
     const row = document.createElement("tr");
     const actionsCell = document.createElement("td");
     const actionsWrap = document.createElement("div");
@@ -344,15 +226,13 @@ function renderRows() {
     editButton.type = "button";
     editButton.dataset.action = "edit";
     editButton.dataset.id = record.id;
-    editButton.textContent = "✎";
-    editButton.title = "ערוך";
+    editButton.textContent = "ערוך";
 
     deleteButton.className = "danger-button";
     deleteButton.type = "button";
     deleteButton.dataset.action = "delete";
     deleteButton.dataset.id = record.id;
-    deleteButton.textContent = "×";
-    deleteButton.title = "מחק";
+    deleteButton.textContent = "מחק";
 
     actionsWrap.append(editButton, deleteButton);
     actionsCell.appendChild(actionsWrap);
@@ -375,7 +255,6 @@ function upsertChart(key, canvasId, type, labels, values, label) {
     state.charts[key].destroy();
   }
 
-  const isDoughnut = type === "doughnut";
   state.charts[key] = new Chart(context, {
     type,
     data: {
@@ -384,65 +263,22 @@ function upsertChart(key, canvasId, type, labels, values, label) {
         {
           label,
           data: values,
-          borderColor: isDoughnut ? "transparent" : config.colors.main,
-          backgroundColor: isDoughnut ? chartColors(values.length) : config.colors.fill,
-          borderWidth: isDoughnut ? 0 : 2,
-          borderRadius: type === "bar" ? 6 : 0,
+          borderColor: config.colors.main,
+          backgroundColor: type === "doughnut" ? chartColors(values.length) : config.colors.fill,
+          borderWidth: 2,
+          borderRadius: type === "bar" ? 8 : 0,
           tension: 0.35,
-          fill: false,
-          hoverOffset: isDoughnut ? 8 : 0
+          fill: false
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: { padding: { top: 4, bottom: 4 } },
       plugins: {
-        legend: isDoughnut ? {
-          display: true,
-          position: "bottom",
-          labels: {
-            boxWidth: 10,
-            boxHeight: 10,
-            borderRadius: 3,
-            useBorderRadius: true,
-            padding: 10,
-            font: { size: 11, family: "'Assistant', Arial, sans-serif" },
-            color: "#667085"
-          }
-        } : { display: false },
-        tooltip: {
-          backgroundColor: "#18212b",
-          titleColor: "#ffffff",
-          bodyColor: "#d9e1e8",
-          padding: 10,
-          cornerRadius: 8,
-          callbacks: {
-            label: (ctx) => ` ${formatMoney(ctx.parsed.y ?? ctx.parsed)}`
-          }
-        }
+        legend: { display: type === "doughnut", position: "bottom" }
       },
-      scales: isDoughnut ? {} : {
-        y: {
-          beginAtZero: true,
-          grid: { color: "#eef2f6", drawBorder: false },
-          ticks: {
-            font: { size: 10, family: "'Assistant', Arial, sans-serif" },
-            color: "#667085",
-            callback: (v) => formatMoney(v)
-          },
-          border: { display: false }
-        },
-        x: {
-          grid: { display: false },
-          ticks: {
-            font: { size: 10, family: "'Assistant', Arial, sans-serif" },
-            color: "#667085"
-          },
-          border: { display: false }
-        }
-      }
+      scales: type === "doughnut" ? {} : { y: { beginAtZero: true } }
     }
   });
 }
@@ -495,21 +331,16 @@ async function loadCategories() {
   fillSelect(els.paymentMethod, config.methods);
 }
 
-async function refresh(resetPage = true) {
+async function refresh() {
   const config = currentConfig();
-  if (resetPage) state.currentPage = 1;
-  showSpinner();
-  try {
-    const [records, summary] = await Promise.all([
-      api(config.api),
-      api(`${config.api}/summary`)
-    ]);
-    state.records = records.records;
-    renderRows();
-    renderSummary(summary);
-  } finally {
-    hideSpinner();
-  }
+  const [records, summary] = await Promise.all([
+    api(config.api),
+    api(`${config.api}/summary`)
+  ]);
+
+  state.records = records.records;
+  renderRows();
+  renderSummary(summary);
 }
 
 async function switchPage(page) {
@@ -543,7 +374,7 @@ els.form.addEventListener("submit", async (event) => {
     }
 
     resetForm();
-    await refresh(false);
+    await refresh();
   } catch (error) {
     setMessage(error.message, true);
   }
@@ -582,18 +413,107 @@ els.navItems.forEach((item) => {
   });
 });
 
-els.prevPage.addEventListener("click", () => {
-  if (state.currentPage > 1) {
-    state.currentPage--;
-    renderRows();
+// Excel Import Handler
+async function handleExcelUpload(file) {
+  const config = currentConfig();
+  const progressContainer = document.querySelector("#importProgress");
+  const progressFill = document.querySelector("#importProgressFill");
+  const progressText = document.querySelector("#importProgressText");
+  const importMessage = document.querySelector("#importMessage");
+  const uploadButton = document.querySelector("#uploadExcelButton");
+
+  progressContainer.style.display = "block";
+  uploadButton.disabled = true;
+  importMessage.textContent = "קורא קובץ...";
+
+  try {
+    // Parse Excel file
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error("הקובץ לא מכיל דפים");
+    }
+
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+    if (rows.length === 0) {
+      throw new Error("הקובץ ריק - לא נמצאו רשומות");
+    }
+
+    // Prepare records with normalized field names
+    const records = rows.map((row) => ({
+      date: String(row.date || row.Date || row.תאריך || "").trim(),
+      amount: Number(row.amount || row.Amount || row.סכום || 0),
+      category: String(row.category || row.Category || row.קטגוריה || "").trim(),
+      description: String(row.description || row.Description || row.תיאור || "").trim(),
+      paymentMethod: String(row.paymentMethod || row.payment_method || row.PaymentMethod || row.Payment_Method || row["אמצעי תשלום"] || "").trim()
+    }));
+
+    importMessage.textContent = `שולח ${records.length} רשומות לשרת...`;
+
+    // Send to server
+    const response = await api(`${config.api}/import`, {
+      method: "POST",
+      body: JSON.stringify(records)
+    });
+
+    // Update progress
+    const imported = response.imported || 0;
+    const total = response.total || records.length;
+    const percentage = Math.round((imported / total) * 100);
+    
+    progressFill.style.width = percentage + "%";
+    progressText.textContent = percentage + "%";
+
+    let resultMessage = `✓ ייובאו בהצלחה: ${imported}/${total} רשומות`;
+    
+    if (response.errors && response.errors.length > 0) {
+      resultMessage += `\n\nשגיאות (${response.errors.length}):\n`;
+      response.errors.slice(0, 5).forEach((err) => {
+        resultMessage += `• שורה ${err.row}: ${err.error}\n`;
+      });
+      if (response.errors.length > 5) {
+        resultMessage += `... ועוד ${response.errors.length - 5} שגיאות`;
+      }
+    }
+
+    importMessage.textContent = resultMessage;
+    setMessage(`${imported} רשומות נייובאו בהצלחה!`);
+
+    // Reset file input and refresh
+    document.querySelector("#excelFileInput").value = "";
+    setTimeout(() => {
+      progressContainer.style.display = "none";
+      refresh().catch((error) => setMessage(error.message, true));
+    }, 2000);
+  } catch (error) {
+    importMessage.textContent = `❌ שגיאה: ${error.message}`;
+    progressFill.style.width = "0%";
+    progressText.textContent = "0%";
+    setMessage(error.message, true);
+  } finally {
+    uploadButton.disabled = false;
   }
+}
+
+document.querySelector("#uploadExcelButton").addEventListener("click", async () => {
+  const fileInput = document.querySelector("#excelFileInput");
+  const file = fileInput.files[0];
+
+  if (!file) {
+    setMessage("בחר קובץ Excel תחילה", true);
+    return;
+  }
+
+  await handleExcelUpload(file);
 });
 
-els.nextPage.addEventListener("click", () => {
-  const totalPages = Math.ceil(state.records.length / PAGE_SIZE);
-  if (state.currentPage < totalPages) {
-    state.currentPage++;
-    renderRows();
+document.querySelector("#excelFileInput").addEventListener("change", (event) => {
+  if (event.target.files[0]) {
+    // Auto-upload on file selection (optional - can remove if prefer manual click)
+    // handleExcelUpload(event.target.files[0]);
   }
 });
 
@@ -605,58 +525,6 @@ async function init() {
   await refresh();
 }
 
-// ── Spinner ──────────────────────────────────────────────────────────────────
-
-function showSpinner() {
-  const el = document.getElementById("spinnerOverlay");
-  if (el) el.style.display = "grid";
-}
-
-function hideSpinner() {
-  const el = document.getElementById("spinnerOverlay");
-  if (el) el.style.display = "none";
-}
-
-// ── Export ───────────────────────────────────────────────────────────────────
-
-function exportToExcel() {
-  const config = currentConfig();
-  const rows = state.records.map((r) => ({
-    תאריך: r.date,
-    סכום: r.amount,
-    קטגוריה: r.category,
-    תיאור: r.description || "",
-    "תשלום / מקור": r.paymentMethod || ""
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, config.plural);
-  XLSX.writeFile(wb, `${config.plural}.xlsx`);
-}
-
-function exportToPdf() {
-  window.print();
-}
-
-document.getElementById("exportExcel").addEventListener("click", exportToExcel);
-document.getElementById("exportPdf").addEventListener("click", exportToPdf);
-
-// ── Bootstrap ────────────────────────────────────────────────────────────────
-
-(async () => {
-  const session = await initSupabase();
-
-  if (session) {
-    currentSession = session;
-    document.getElementById("userEmail").textContent = session.user.email;
-    hideAuthOverlay();
-    await init();
-  } else {
-    showAuthOverlay();
-  }
-
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    currentSession = session;
-    if (!session) showAuthOverlay();
-  });
-})().catch(console.error);
+init().catch((error) => {
+  setMessage(error.message, true);
+});
