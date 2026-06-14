@@ -46,7 +46,8 @@ const pageConfig = {
 const state = {
   activePage: "expenses",
   records: [],
-  charts: {}
+  charts: {},
+  filterMonth: ""
 };
 
 const PAGE_SIZE = 25;
@@ -79,7 +80,9 @@ const els = {
   tableTitle: document.querySelector("#tableTitle"),
   recordsBody: document.querySelector("#recordsBody"),
   emptyState: document.querySelector("#emptyState"),
-  recordCount: document.querySelector("#recordCount")
+  recordCount: document.querySelector("#recordCount"),
+  monthFilter: document.querySelector("#monthFilter"),
+  clearFilter: document.querySelector("#clearFilter")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -202,18 +205,26 @@ function handleRecordAction(action, id) {
   }
 }
 
+function filteredRecords() {
+  if (!state.filterMonth) return state.records;
+  return state.records.filter((r) => r.date && r.date.startsWith(state.filterMonth));
+}
+
 function renderRows() {
   const config = currentConfig();
-  const total = state.records.length;
+  const visible = filteredRecords();
+  const total = visible.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (currentPage > totalPages) currentPage = totalPages;
 
   const start = (currentPage - 1) * PAGE_SIZE;
-  const pageRecords = state.records.slice(start, start + PAGE_SIZE);
+  const pageRecords = visible.slice(start, start + PAGE_SIZE);
 
   els.recordsBody.innerHTML = "";
   els.emptyState.classList.toggle("visible", total === 0);
-  els.recordCount.textContent = `${total} ${config.plural}`;
+  els.recordCount.textContent = state.filterMonth
+    ? `${total} מתוך ${state.records.length} ${config.plural}`
+    : `${total} ${config.plural}`;
 
   pageRecords.forEach((record) => {
     const row = document.createElement("tr");
@@ -385,6 +396,9 @@ async function refresh() {
 async function switchPage(page) {
   if (!pageConfig[page] || state.activePage === page) return;
   state.activePage = page;
+  state.filterMonth = "";
+  els.monthFilter.value = "";
+  els.clearFilter.classList.add("hidden");
   applyPageText();
   await loadCategories();
   resetForm();
@@ -624,6 +638,21 @@ document.querySelector("#excelFileInput").addEventListener("change", (event) => 
     // Auto-upload on file selection (optional - can remove if prefer manual click)
     // handleExcelUpload(event.target.files[0]);
   }
+});
+
+els.monthFilter.addEventListener("change", () => {
+  state.filterMonth = els.monthFilter.value;
+  els.clearFilter.classList.toggle("hidden", !state.filterMonth);
+  currentPage = 1;
+  renderRows();
+});
+
+els.clearFilter.addEventListener("click", () => {
+  state.filterMonth = "";
+  els.monthFilter.value = "";
+  els.clearFilter.classList.add("hidden");
+  currentPage = 1;
+  renderRows();
 });
 
 async function init() {

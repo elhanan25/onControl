@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="styles.css?v=20260614-pagination-import-fix">
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-    <script src="app.js?v=20260614-header-row-detect" defer></script>
+    <script src="app.js?v=20260614-month-filter" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -120,7 +120,11 @@
             <section class="panel table-panel">
               <div class="panel-title">
                 <h2 id="tableTitle">הוצאות אחרונות</h2>
-                <span id="recordCount"></span>
+                <div class="table-filters">
+                  <input type="month" id="monthFilter" class="month-filter-input" title="סנן לפי חודש">
+                  <button class="small-button hidden" id="clearFilter">הכל</button>
+                  <span id="recordCount"></span>
+                </div>
               </div>
               <div class="table-wrap">
                 <table>

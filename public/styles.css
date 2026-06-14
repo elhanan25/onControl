@@ -524,6 +524,20 @@ tbody tr:hover {
   font-weight: 700;
 }
 
+.table-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.month-filter-input {
+  min-height: 34px;
+  width: auto;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
 /* ── Pagination ─────────────────────────────────────────────────────────── */
 
 .pagination {
