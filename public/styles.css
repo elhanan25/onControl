@@ -137,7 +137,7 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .topbar {
@@ -219,9 +219,10 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: 270px minmax(0, 1fr) 210px;
+  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 14px;
-  align-items: stretch;
+  align-items: start;
   flex: 1;
   min-height: 0;
   margin-bottom: 0;
@@ -281,6 +282,28 @@ h2 {
   position: sticky;
   top: 18px;
   max-width: 100%;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.import-panel {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.content-stack {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .form-panel.editing {
@@ -377,18 +400,23 @@ select:focus {
 
 
 .chart-panel {
-  min-height: 0;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
 }
 
 canvas {
   width: 100%;
-  max-height: 140px;
+  flex: 1;
+  min-height: 0;
+  max-height: 180px;
 }
 
 .table-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 200px;
 }
 
 .table-wrap {
@@ -749,9 +777,24 @@ tbody tr:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .topbar,
-  .workspace {
+  .topbar {
     display: block;
+  }
+
+  .workspace {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .content-stack,
+  .form-panel,
+  .import-panel {
+    grid-column: unset;
+    grid-row: unset;
+  }
+
+  .charts {
+    grid-template-columns: 1fr 1fr;
   }
 
   .date-pill {
