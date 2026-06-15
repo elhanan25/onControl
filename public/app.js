@@ -412,6 +412,7 @@ async function refresh() {
   currentPage = 1;
   renderRows();
   renderSummary(summary);
+  updateSummaryForFilter();
 }
 
 async function switchPage(page) {
@@ -626,10 +627,13 @@ async function handleExcelUpload(file) {
     importMessage.textContent = resultMessage;
     setMessage(`${imported} רשומות נייובאו בהצלחה!`);
 
-    // Reset file input and refresh
+    // Reset file input, clear month filter so imported records are visible, and refresh
     document.querySelector("#excelFileInput").value = "";
     setTimeout(() => {
       progressContainer.style.display = "none";
+      state.filterMonth = "";
+      els.monthFilter.value = "";
+      els.clearFilter.classList.add("hidden");
       refresh().catch((error) => setMessage(error.message, true));
     }, 2000);
   } catch (error) {
