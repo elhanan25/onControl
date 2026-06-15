@@ -538,6 +538,13 @@ tbody tr:hover {
   font-size: 0.85rem;
 }
 
+.category-filter-select {
+  min-height: 34px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  max-width: 160px;
+}
+
 /* ── Pagination ─────────────────────────────────────────────────────────── */
 
 .pagination {

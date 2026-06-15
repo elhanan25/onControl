@@ -48,6 +48,7 @@ const state = {
   records: [],
   charts: {},
   filterMonth: "",
+  filterCategory: "",
   lastSummary: null
 };
 
@@ -83,7 +84,8 @@ const els = {
   emptyState: document.querySelector("#emptyState"),
   recordCount: document.querySelector("#recordCount"),
   monthFilter: document.querySelector("#monthFilter"),
-  clearFilter: document.querySelector("#clearFilter")
+  clearFilter: document.querySelector("#clearFilter"),
+  categoryFilter: document.querySelector("#categoryFilter")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -207,8 +209,14 @@ function handleRecordAction(action, id) {
 }
 
 function filteredRecords() {
-  if (!state.filterMonth) return state.records;
-  return state.records.filter((r) => r.date && r.date.startsWith(state.filterMonth));
+  let records = state.records;
+  if (state.filterMonth) {
+    records = records.filter((r) => r.date && r.date.startsWith(state.filterMonth));
+  }
+  if (state.filterCategory) {
+    records = records.filter((r) => r.category === state.filterCategory);
+  }
+  return records;
 }
 
 function renderRows() {
@@ -223,7 +231,8 @@ function renderRows() {
 
   els.recordsBody.innerHTML = "";
   els.emptyState.classList.toggle("visible", total === 0);
-  els.recordCount.textContent = state.filterMonth
+  const isFiltered = state.filterMonth || state.filterCategory;
+  els.recordCount.textContent = isFiltered
     ? `${total} מתוך ${state.records.length} ${config.plural}`
     : `${total} ${config.plural}`;
 
@@ -337,19 +346,27 @@ function updateSummaryForFilter() {
   const config = currentConfig();
   if (!state.lastSummary) return;
 
-  if (!state.filterMonth) {
+  const hasFilter = state.filterMonth || state.filterCategory;
+  if (!hasFilter) {
     els.allTotal.textContent = formatMoney(state.lastSummary.totals.total);
     els.allMetricLabel.textContent = `סה״כ ${config.plural}`;
     return;
   }
 
   const filteredTotal = filteredRecords().reduce((sum, r) => sum + Number(r.amount || 0), 0);
-  const [year, month] = state.filterMonth.split("-");
-  const monthLabel = new Date(Number(year), Number(month) - 1, 1)
-    .toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+
+  let label = "";
+  if (state.filterMonth) {
+    const [year, month] = state.filterMonth.split("-");
+    label = new Date(Number(year), Number(month) - 1, 1)
+      .toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+  }
+  if (state.filterCategory) {
+    label = label ? `${label} · ${state.filterCategory}` : state.filterCategory;
+  }
 
   els.allTotal.textContent = formatMoney(filteredTotal);
-  els.allMetricLabel.textContent = monthLabel;
+  els.allMetricLabel.textContent = label;
 }
 
 function renderSummary(summary) {
@@ -394,11 +411,22 @@ function applyPageText() {
   });
 }
 
+function fillCategoryFilter(categories) {
+  const current = state.filterCategory;
+  els.categoryFilter.innerHTML =
+    `<option value="">כל הקטגוריות</option>` +
+    categories.map((c) => `<option value="${c}">${c}</option>`).join("");
+  if (current && categories.includes(current)) {
+    els.categoryFilter.value = current;
+  }
+}
+
 async function loadCategories() {
   const config = currentConfig();
   const data = await api(`${config.api}/categories`);
   fillSelect(els.category, data.categories);
   fillSelect(els.paymentMethod, config.methods);
+  fillCategoryFilter(data.categories);
 }
 
 async function refresh() {
@@ -410,6 +438,8 @@ async function refresh() {
 
   state.records = records.records;
   currentPage = 1;
+  const categories = [...new Set(records.records.map((r) => r.category).filter(Boolean))].sort();
+  fillCategoryFilter(categories);
   renderRows();
   renderSummary(summary);
   updateSummaryForFilter();
@@ -419,8 +449,10 @@ async function switchPage(page) {
   if (!pageConfig[page] || state.activePage === page) return;
   state.activePage = page;
   state.filterMonth = "";
+  state.filterCategory = "";
   els.monthFilter.value = "";
   els.clearFilter.classList.add("hidden");
+  els.categoryFilter.value = "";
   applyPageText();
   await loadCategories();
   resetForm();
@@ -632,8 +664,10 @@ async function handleExcelUpload(file) {
     setTimeout(() => {
       progressContainer.style.display = "none";
       state.filterMonth = "";
+      state.filterCategory = "";
       els.monthFilter.value = "";
       els.clearFilter.classList.add("hidden");
+      els.categoryFilter.value = "";
       refresh().catch((error) => setMessage(error.message, true));
     }, 2000);
   } catch (error) {
@@ -677,6 +711,13 @@ els.clearFilter.addEventListener("click", () => {
   state.filterMonth = "";
   els.monthFilter.value = "";
   els.clearFilter.classList.add("hidden");
+  currentPage = 1;
+  renderRows();
+  updateSummaryForFilter();
+});
+
+els.categoryFilter.addEventListener("change", () => {
+  state.filterCategory = els.categoryFilter.value;
   currentPage = 1;
   renderRows();
   updateSummaryForFilter();

@@ -7,10 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260614-pagination-import-fix">
+    <link rel="stylesheet" href="styles.css?v=20260615-category-filter">
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-    <script src="app.js?v=20260614-filter-summary" defer></script>
+    <script src="app.js?v=20260615-category-filter" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -122,6 +122,9 @@
                 <h2 id="tableTitle">הוצאות אחרונות</h2>
                 <div class="table-filters">
                   <input type="month" id="monthFilter" class="month-filter-input" title="סנן לפי חודש">
+                  <select id="categoryFilter" class="category-filter-select" title="סנן לפי קטגוריה">
+                    <option value="">כל הקטגוריות</option>
+                  </select>
                   <button class="small-button hidden" id="clearFilter">הכל</button>
                   <span id="recordCount"></span>
                 </div>
