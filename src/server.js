@@ -12,7 +12,7 @@ const ledgerTypes = {
   expenses: {
     table: "expenses",
     singular: "expense",
-    categories: ["מזון", "תחבורה", "דיור", "בריאות", "בילויים", "קניות", "חשבונות", "חינוך", "אחר"]
+    categories: ["מזון", "תחבורה", "דיור", "בריאות", "בילויים", "קניות", "חשבונות", "חינוך", "ביגוד", "אחר"]
   },
   incomes: {
     table: "incomes",
