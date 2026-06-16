@@ -7,10 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260615-search-filter">
+    <link rel="stylesheet" href="styles.css?v=20260616-import-bar">
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-    <script src="app.js?v=20260615-search-filter" defer></script>
+    <script src="app.js?v=20260616-import-bar" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -96,27 +96,19 @@
             <button class="primary-button" type="submit" id="submitButton">שמור הוצאה</button>
           </form>
 
-          <div class="panel import-panel">
-            <div class="panel-title">
-              <h2>יבוא מ-Excel</h2>
-            </div>
-            <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">יבא קובץ Excel עם נתונים. עמודות נדרשות: date, amount, category, description, paymentMethod</p>
-            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-              <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="flex: 1; min-width: 200px;">
-              <button class="primary-button" type="button" id="uploadExcelButton">יבא</button>
-            </div>
-            <div id="importProgress" style="display: none; margin-top: 1rem;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                <div id="importProgressBar" style="flex: 1; height: 8px; background: #ddd; border-radius: 4px; overflow: hidden;">
-                  <div style="height: 100%; background: #146c43; width: 0%; transition: width 0.3s;" id="importProgressFill"></div>
-                </div>
-                <span id="importProgressText" style="font-size: 0.85rem;">0%</span>
-              </div>
-              <p id="importMessage" style="font-size: 0.9rem;"></p>
-            </div>
-          </div>
-
           <div class="content-stack">
+            <div class="panel import-panel">
+              <span class="import-label">יבוא מ-Excel</span>
+              <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="import-file-input">
+              <button class="small-button" type="button" id="uploadExcelButton">יבא</button>
+              <div id="importProgress" style="display: none;">
+                <div class="import-progress-bar">
+                  <div class="import-progress-fill" id="importProgressFill"></div>
+                </div>
+                <span id="importProgressText" style="font-size: 0.8rem;">0%</span>
+              </div>
+              <span id="importMessage" class="import-message"></span>
+            </div>
             <section class="panel table-panel">
               <div class="panel-title">
                 <h2 id="tableTitle">הוצאות אחרונות</h2>
