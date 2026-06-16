@@ -545,6 +545,13 @@ tbody tr:hover {
   max-width: 160px;
 }
 
+.search-filter-input {
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  width: 180px;
+}
+
 /* ── Pagination ─────────────────────────────────────────────────────────── */
 
 .pagination {

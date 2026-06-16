@@ -49,6 +49,7 @@ const state = {
   charts: {},
   filterMonth: "",
   filterCategory: "",
+  filterSearch: "",
   lastSummary: null
 };
 
@@ -85,7 +86,8 @@ const els = {
   recordCount: document.querySelector("#recordCount"),
   monthFilter: document.querySelector("#monthFilter"),
   clearFilter: document.querySelector("#clearFilter"),
-  categoryFilter: document.querySelector("#categoryFilter")
+  categoryFilter: document.querySelector("#categoryFilter"),
+  searchFilter: document.querySelector("#searchFilter")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -215,6 +217,16 @@ function filteredRecords() {
   }
   if (state.filterCategory) {
     records = records.filter((r) => r.category === state.filterCategory);
+  }
+  if (state.filterSearch) {
+    const q = state.filterSearch.toLowerCase();
+    records = records.filter((r) =>
+      (r.description && r.description.toLowerCase().includes(q)) ||
+      (r.category && r.category.toLowerCase().includes(q)) ||
+      (r.paymentMethod && r.paymentMethod.toLowerCase().includes(q)) ||
+      (r.amount && String(r.amount).includes(q)) ||
+      (r.date && r.date.includes(q))
+    );
   }
   return records;
 }
@@ -346,7 +358,7 @@ function updateSummaryForFilter() {
   const config = currentConfig();
   if (!state.lastSummary) return;
 
-  const hasFilter = state.filterMonth || state.filterCategory;
+  const hasFilter = state.filterMonth || state.filterCategory || state.filterSearch;
   if (!hasFilter) {
     els.allTotal.textContent = formatMoney(state.lastSummary.totals.total);
     els.allMetricLabel.textContent = `סה״כ ${config.plural}`;
@@ -363,6 +375,9 @@ function updateSummaryForFilter() {
   }
   if (state.filterCategory) {
     label = label ? `${label} · ${state.filterCategory}` : state.filterCategory;
+  }
+  if (state.filterSearch) {
+    label = label ? `${label} · "${state.filterSearch}"` : `"${state.filterSearch}"`;
   }
 
   els.allTotal.textContent = formatMoney(filteredTotal);
@@ -450,9 +465,11 @@ async function switchPage(page) {
   state.activePage = page;
   state.filterMonth = "";
   state.filterCategory = "";
+  state.filterSearch = "";
   els.monthFilter.value = "";
   els.clearFilter.classList.add("hidden");
   els.categoryFilter.value = "";
+  els.searchFilter.value = "";
   applyPageText();
   await loadCategories();
   resetForm();
@@ -665,9 +682,11 @@ async function handleExcelUpload(file) {
       progressContainer.style.display = "none";
       state.filterMonth = "";
       state.filterCategory = "";
+      state.filterSearch = "";
       els.monthFilter.value = "";
       els.clearFilter.classList.add("hidden");
       els.categoryFilter.value = "";
+      els.searchFilter.value = "";
       refresh().catch((error) => setMessage(error.message, true));
     }, 2000);
   } catch (error) {
@@ -718,6 +737,13 @@ els.clearFilter.addEventListener("click", () => {
 
 els.categoryFilter.addEventListener("change", () => {
   state.filterCategory = els.categoryFilter.value;
+  currentPage = 1;
+  renderRows();
+  updateSummaryForFilter();
+});
+
+els.searchFilter.addEventListener("input", () => {
+  state.filterSearch = els.searchFilter.value.trim();
   currentPage = 1;
   renderRows();
   updateSummaryForFilter();
