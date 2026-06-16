@@ -12,7 +12,18 @@ const ledgerTypes = {
   expenses: {
     table: "expenses",
     singular: "expense",
-    categories: ["מזון", "תחבורה", "דיור", "בריאות", "בילויים", "קניות", "חשבונות", "חינוך", "ביגוד", "אחר"]
+    categories: [
+      "מזון", "מסעדות וקפה", "סופרמרקט",
+      "תחבורה", "דלק", "חניה",
+      "דיור", "ארנונה", "חשמל", "מים", "גז", "ועד בית",
+      "חשבונות", "טלפון", "אינטרנט", "ביטוח",
+      "בריאות", "רופא", "תרופות",
+      "חינוך", "ילדים",
+      "ביגוד",
+      "קניות",
+      "בילויים", "ספורט",
+      "אחר"
+    ]
   },
   incomes: {
     table: "incomes",
@@ -327,15 +338,9 @@ async function main() {
     res.json({ ok: true, database: store.name });
   });
 
-  app.get("/api/:type/categories", requireLedger, asyncHandler(async (req, res) => {
-    const predefined = req.ledger.categories;
-    const fromDb = await store.listCategories(req.params.type);
-    const predefinedSet = new Set(predefined);
-    const extra = fromDb.filter((c) => !predefinedSet.has(c)).sort();
-    const withoutOther = predefined.filter((c) => c !== "אחר");
-    const categories = [...withoutOther, ...extra, "אחר"];
-    res.json({ categories });
-  }));
+  app.get("/api/:type/categories", requireLedger, (req, res) => {
+    res.json({ categories: req.ledger.categories });
+  });
 
   app.get("/api/:type", requireLedger, asyncHandler(async (req, res) => {
     const records = await store.list(req.params.type);
