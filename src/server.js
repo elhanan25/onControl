@@ -150,6 +150,13 @@ function createSqliteStore() {
       const { table } = getLedgerConfig(type);
       return db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes > 0;
     },
+    async listCategories(type) {
+      const { table } = getLedgerConfig(type);
+      return db
+        .prepare(`SELECT DISTINCT category FROM ${table} WHERE category IS NOT NULL AND category != '' ORDER BY category`)
+        .all()
+        .map((r) => r.category);
+    },
     async summary(type) {
       const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
@@ -243,6 +250,13 @@ async function createPostgresStore() {
       const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
       return result.rowCount > 0;
     },
+    async listCategories(type) {
+      const { table } = getLedgerConfig(type);
+      const result = await pool.query(
+        `SELECT DISTINCT category FROM ${table} WHERE category IS NOT NULL AND category != '' ORDER BY category`
+      );
+      return result.rows.map((r) => r.category);
+    },
     async summary(type) {
       const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
@@ -313,9 +327,15 @@ async function main() {
     res.json({ ok: true, database: store.name });
   });
 
-  app.get("/api/:type/categories", requireLedger, (req, res) => {
-    res.json({ categories: req.ledger.categories });
-  });
+  app.get("/api/:type/categories", requireLedger, asyncHandler(async (req, res) => {
+    const predefined = req.ledger.categories;
+    const fromDb = await store.listCategories(req.params.type);
+    const predefinedSet = new Set(predefined);
+    const extra = fromDb.filter((c) => !predefinedSet.has(c)).sort();
+    const withoutOther = predefined.filter((c) => c !== "אחר");
+    const categories = [...withoutOther, ...extra, "אחר"];
+    res.json({ categories });
+  }));
 
   app.get("/api/:type", requireLedger, asyncHandler(async (req, res) => {
     const records = await store.list(req.params.type);
