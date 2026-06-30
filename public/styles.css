@@ -472,7 +472,7 @@ canvas {
 .table-wrap {
   flex: 1;
   min-height: 0;
-  max-height: 68vh;
+  max-height: 380px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
