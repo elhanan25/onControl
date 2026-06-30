@@ -50,7 +50,8 @@ const state = {
   filterMonth: "",
   filterCategory: "",
   filterSearch: "",
-  lastSummary: null
+  lastSummary: null,
+  predefinedCategories: []
 };
 
 const PAGE_SIZE = 25;
@@ -439,6 +440,7 @@ function fillCategoryFilter(categories) {
 async function loadCategories() {
   const config = currentConfig();
   const data = await api(`${config.api}/categories`);
+  state.predefinedCategories = data.categories;
   fillSelect(els.category, data.categories);
   fillSelect(els.paymentMethod, config.methods);
   fillCategoryFilter(data.categories);
@@ -453,7 +455,8 @@ async function refresh() {
 
   state.records = records.records;
   currentPage = 1;
-  const categories = [...new Set(records.records.map((r) => r.category).filter(Boolean))].sort();
+  const dbCategories = records.records.map((r) => r.category).filter(Boolean);
+  const categories = [...new Set([...state.predefinedCategories, ...dbCategories])].sort((a, b) => a.localeCompare(b, "he"));
   fillCategoryFilter(categories);
   renderRows();
   renderSummary(summary);
