@@ -96,19 +96,20 @@
             <button class="primary-button" type="submit" id="submitButton">שמור הוצאה</button>
           </form>
 
-          <div class="content-stack">
-            <div class="panel import-panel">
-              <span class="import-label">יבוא מ-Excel</span>
-              <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="import-file-input">
-              <button class="small-button" type="button" id="uploadExcelButton">יבא</button>
-              <div id="importProgress" style="display: none;">
-                <div class="import-progress-bar">
-                  <div class="import-progress-fill" id="importProgressFill"></div>
-                </div>
-                <span id="importProgressText" style="font-size: 0.8rem;">0%</span>
+          <div class="panel import-panel">
+            <span class="import-label">יבוא מ-Excel</span>
+            <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="import-file-input">
+            <button class="small-button" type="button" id="uploadExcelButton">יבא</button>
+            <div id="importProgress" style="display: none;">
+              <div class="import-progress-bar">
+                <div class="import-progress-fill" id="importProgressFill"></div>
               </div>
-              <span id="importMessage" class="import-message"></span>
+              <span id="importProgressText" style="font-size: 0.8rem;">0%</span>
             </div>
+            <span id="importMessage" class="import-message"></span>
+          </div>
+
+          <div class="content-stack">
             <section class="panel table-panel">
               <div class="panel-title">
                 <h2 id="tableTitle">הוצאות אחרונות</h2>
