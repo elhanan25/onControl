@@ -88,7 +88,17 @@ const els = {
   monthFilter: document.querySelector("#monthFilter"),
   clearFilter: document.querySelector("#clearFilter"),
   categoryFilter: document.querySelector("#categoryFilter"),
-  searchFilter: document.querySelector("#searchFilter")
+  searchFilter: document.querySelector("#searchFilter"),
+  authOverlay: document.querySelector("#authOverlay"),
+  loginForm: document.querySelector("#loginForm"),
+  registerForm: document.querySelector("#registerForm"),
+  loginMessage: document.querySelector("#loginMessage"),
+  registerMessage: document.querySelector("#registerMessage"),
+  showRegisterBtn: document.querySelector("#showRegisterBtn"),
+  showLoginBtn: document.querySelector("#showLoginBtn"),
+  logoutButton: document.querySelector("#logoutButton"),
+  userLabel: document.querySelector("#userLabel"),
+  appShell: document.querySelector(".app-shell")
 };
 
 const moneyFormatter = new Intl.NumberFormat("he-IL", {
@@ -133,6 +143,12 @@ async function api(path, options = {}) {
     headers: { "Content-Type": "application/json" },
     ...options
   });
+
+  if (response.status === 401) {
+    showAuthOverlay("login");
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || "הבקשה נכשלה.");
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -752,12 +768,113 @@ els.searchFilter.addEventListener("input", () => {
   updateSummaryForFilter();
 });
 
+function showApp(username) {
+  els.appShell.classList.remove("hidden");
+  els.authOverlay.classList.remove("visible");
+  els.userLabel.textContent = username;
+}
+
+function showAuthOverlay(section) {
+  els.authOverlay.classList.add("visible");
+  els.appShell.classList.add("hidden");
+  if (section === "register") {
+    document.querySelector("#loginSection").classList.add("hidden");
+    document.querySelector("#registerSection").classList.remove("hidden");
+  } else {
+    document.querySelector("#registerSection").classList.add("hidden");
+    document.querySelector("#loginSection").classList.remove("hidden");
+  }
+}
+
+els.showRegisterBtn.addEventListener("click", () => {
+  document.querySelector("#loginSection").classList.add("hidden");
+  document.querySelector("#registerSection").classList.remove("hidden");
+});
+
+els.showLoginBtn.addEventListener("click", () => {
+  document.querySelector("#registerSection").classList.add("hidden");
+  document.querySelector("#loginSection").classList.remove("hidden");
+});
+
+els.loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.loginMessage.textContent = "";
+  const username = document.querySelector("#loginUsername").value;
+  const password = document.querySelector("#loginPassword").value;
+  try {
+    const data = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const body = await data.json();
+    if (!data.ok) {
+      els.loginMessage.textContent = body.error || "שגיאה בכניסה.";
+      return;
+    }
+    showApp(body.user.username);
+    state.activePage = "expenses";
+    applyPageText();
+    await loadCategories();
+    resetForm();
+    await refresh();
+  } catch {
+    els.loginMessage.textContent = "שגיאה בחיבור לשרת.";
+  }
+});
+
+els.registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.registerMessage.textContent = "";
+  const username = document.querySelector("#regUsername").value;
+  const password = document.querySelector("#regPassword").value;
+  try {
+    const data = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const body = await data.json();
+    if (!data.ok) {
+      els.registerMessage.textContent = body.error || "שגיאה בהרשמה.";
+      return;
+    }
+    showApp(body.user.username);
+    state.activePage = "expenses";
+    applyPageText();
+    await loadCategories();
+    resetForm();
+    await refresh();
+  } catch {
+    els.registerMessage.textContent = "שגיאה בחיבור לשרת.";
+  }
+});
+
+els.logoutButton.addEventListener("click", async () => {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } catch {}
+  showAuthOverlay("login");
+});
+
 async function init() {
   els.todayLabel.textContent = dateFormatter.format(new Date());
   applyPageText();
-  await loadCategories();
-  resetForm();
-  await refresh();
+
+  try {
+    const response = await fetch("/api/auth/me");
+    if (!response.ok) {
+      showAuthOverlay("login");
+      return;
+    }
+    const data = await response.json();
+    showApp(data.user.username);
+    await loadCategories();
+    resetForm();
+    await refresh();
+  } catch {
+    showAuthOverlay("login");
+  }
 }
 
 init().catch((error) => {

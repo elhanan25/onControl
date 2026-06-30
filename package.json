@@ -9,9 +9,11 @@
     "test": "node --test"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.9.1",
     "chart.js": "^4.4.8",
     "express": "^4.21.2",
+    "express-session": "^1.18.1",
     "pg": "^8.21.0",
     "xlsx": "^0.18.5"
   }

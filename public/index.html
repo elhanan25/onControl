@@ -13,7 +13,35 @@
     <script src="app.js?v=20260616-import-bar" defer></script>
   </head>
   <body>
-    <div class="app-shell">
+    <div class="auth-overlay" id="authOverlay">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <span class="brand-mark">₪</span>
+          <div><strong>ניהול כספים</strong><span>מעקב אישי</span></div>
+        </div>
+        <div id="loginSection">
+          <h2>כניסה למערכת</h2>
+          <form id="loginForm">
+            <label>שם משתמש<input type="text" id="loginUsername" autocomplete="username" required></label>
+            <label>סיסמה<input type="password" id="loginPassword" autocomplete="current-password" required></label>
+            <p class="form-message" id="loginMessage" role="status"></p>
+            <button class="primary-button" type="submit">כניסה</button>
+          </form>
+          <button class="link-button" type="button" id="showRegisterBtn">אין לך חשבון? הירשם</button>
+        </div>
+        <div id="registerSection" class="hidden">
+          <h2>הרשמה</h2>
+          <form id="registerForm">
+            <label>שם משתמש<input type="text" id="regUsername" autocomplete="username" required></label>
+            <label>סיסמה (לפחות 6 תווים)<input type="password" id="regPassword" autocomplete="new-password" required minlength="6"></label>
+            <p class="form-message" id="registerMessage" role="status"></p>
+            <button class="primary-button" type="submit">הרשמה</button>
+          </form>
+          <button class="link-button" type="button" id="showLoginBtn">יש לך חשבון? התחבר</button>
+        </div>
+      </div>
+    </div>
+    <div class="app-shell hidden">
       <aside class="sidebar" aria-label="ניווט ראשי">
         <div class="brand">
           <span class="brand-mark">₪</span>
@@ -33,6 +61,13 @@
             <span>הכנסות</span>
           </button>
         </nav>
+        <div class="sidebar-footer">
+          <span class="user-email" id="userLabel"></span>
+          <button class="nav-item logout-button" type="button" id="logoutButton">
+            <span class="nav-icon">←</span>
+            <span>יציאה</span>
+          </button>
+        </div>
       </aside>
 
       <main class="main-panel">

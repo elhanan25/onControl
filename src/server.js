@@ -1,6 +1,8 @@
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
+const session = require("express-session");
+const bcrypt = require("bcryptjs");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
 
@@ -17,12 +19,13 @@ const ledgerTypes = {
       "ביגוד", "ביטוח", "בילויים", "בריאות",
       "גז",
       "דיור", "דלק",
-      "חינוך", "חניה", "חשמל", "חשמל",
+      "חינוך", "חניה", "חשמל",
       "טלפון",
       "מזון", "מים", "מסעדות וקפה",
       "ספורט",
       "קניות",
       "שונות", "תחבורה",
+      "עירייה",
       "אחר"
     ]
   },
@@ -120,27 +123,57 @@ function createSqliteStore() {
   const db = new Database(dbPath);
 
   db.pragma("journal_mode = WAL");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   Object.values(ledgerTypes).forEach((config) => {
     db.exec(sqliteCreateTableSql(config.table));
+    try { db.exec(`ALTER TABLE ${config.table} ADD COLUMN user_id INTEGER`) } catch {}
   });
 
   return {
     name: "SQLite",
-    async list(type) {
-      const { table } = getLedgerConfig(type);
-      return db.prepare(`SELECT * FROM ${table} ORDER BY date DESC, id DESC`).all().map(mapRecord);
+
+    createUser(username, passwordHash) {
+      const result = db
+        .prepare(`INSERT INTO users (username, password_hash) VALUES (?, ?)`)
+        .run(username, passwordHash);
+      return db.prepare(`SELECT id, username FROM users WHERE id = ?`).get(result.lastInsertRowid);
     },
-    async create(type, record) {
+
+    findUserByUsername(username) {
+      return db.prepare(`SELECT * FROM users WHERE username = ?`).get(username);
+    },
+
+    findUserById(id) {
+      return db.prepare(`SELECT id, username FROM users WHERE id = ?`).get(id);
+    },
+
+    async list(type, userId) {
+      const { table } = getLedgerConfig(type);
+      return db
+        .prepare(`SELECT * FROM ${table} WHERE user_id = ? ORDER BY date DESC, id DESC`)
+        .all(userId)
+        .map(mapRecord);
+    },
+    async create(type, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = db
         .prepare(`
-          INSERT INTO ${table} (date, amount, category, description, payment_method)
-          VALUES (@date, @amount, @category, @description, @paymentMethod)
+          INSERT INTO ${table} (date, amount, category, description, payment_method, user_id)
+          VALUES (@date, @amount, @category, @description, @paymentMethod, @userId)
         `)
-        .run(record);
+        .run({ ...record, userId });
       return mapRecord(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(result.lastInsertRowid));
     },
-    async update(type, id, record) {
+    async update(type, id, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = db
         .prepare(`
@@ -151,46 +184,47 @@ function createSqliteStore() {
               description = @description,
               payment_method = @paymentMethod,
               updated_at = CURRENT_TIMESTAMP
-          WHERE id = @id
+          WHERE id = @id AND user_id = @userId
         `)
-        .run({ ...record, id });
+        .run({ ...record, id, userId });
 
       if (result.changes === 0) return null;
       return mapRecord(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id));
     },
-    async delete(type, id) {
+    async delete(type, id, userId) {
       const { table } = getLedgerConfig(type);
-      return db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes > 0;
+      return db.prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`).run(id, userId).changes > 0;
     },
-    async listCategories(type) {
+    async listCategories(type, userId) {
       const { table } = getLedgerConfig(type);
       return db
-        .prepare(`SELECT DISTINCT category FROM ${table} WHERE category IS NOT NULL AND category != '' ORDER BY category`)
-        .all()
+        .prepare(`SELECT DISTINCT category FROM ${table} WHERE user_id = ? AND category IS NOT NULL AND category != '' ORDER BY category`)
+        .all(userId)
         .map((r) => r.category);
     },
-    async summary(type) {
+    async summary(type, userId) {
       const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
       const month = today.slice(0, 7);
-      const total = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table}`).get().value;
+      const total = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE user_id = ?`).get(userId).value;
       const todayTotal = db
-        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE date = ?`)
-        .get(today).value;
+        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE user_id = ? AND date = ?`)
+        .get(userId, today).value;
       const monthTotal = db
-        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE substr(date, 1, 7) = ?`)
-        .get(month).value;
+        .prepare(`SELECT COALESCE(SUM(amount), 0) AS value FROM ${table} WHERE user_id = ? AND substr(date, 1, 7) = ?`)
+        .get(userId, month).value;
       const category = db
-        .prepare(`SELECT category, ROUND(SUM(amount), 2) AS amount FROM ${table} GROUP BY category ORDER BY amount DESC`)
-        .all();
+        .prepare(`SELECT category, ROUND(SUM(amount), 2) AS amount FROM ${table} WHERE user_id = ? GROUP BY category ORDER BY amount DESC`)
+        .all(userId);
       const monthly = db
         .prepare(`
           SELECT substr(date, 1, 7) AS month, ROUND(SUM(amount), 2) AS amount
           FROM ${table}
+          WHERE user_id = ?
           GROUP BY substr(date, 1, 7)
           ORDER BY month ASC
         `)
-        .all();
+        .all(userId);
 
       return {
         totals: {
@@ -211,7 +245,19 @@ async function createPostgresStore() {
     ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
   });
 
-  await Promise.all(Object.values(ledgerTypes).map((config) => pool.query(postgresCreateTableSql(config.table))));
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id BIGSERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await Promise.all(Object.values(ledgerTypes).map(async (config) => {
+    await pool.query(postgresCreateTableSql(config.table));
+    await pool.query(`ALTER TABLE ${config.table} ADD COLUMN IF NOT EXISTS user_id BIGINT`);
+  }));
 
   const toRows = (result) => result.rows.map((row) => ({
     ...row,
@@ -222,24 +268,43 @@ async function createPostgresStore() {
 
   return {
     name: "PostgreSQL",
-    async list(type) {
+
+    async createUser(username, passwordHash) {
+      const result = await pool.query(
+        `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`,
+        [username, passwordHash]
+      );
+      return result.rows[0];
+    },
+
+    async findUserByUsername(username) {
+      const result = await pool.query(`SELECT * FROM users WHERE username = $1`, [username]);
+      return result.rows[0] || null;
+    },
+
+    async findUserById(id) {
+      const result = await pool.query(`SELECT id, username FROM users WHERE id = $1`, [id]);
+      return result.rows[0] || null;
+    },
+
+    async list(type, userId) {
       const { table } = getLedgerConfig(type);
-      const result = await pool.query(`SELECT * FROM ${table} ORDER BY date DESC, id DESC`);
+      const result = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1 ORDER BY date DESC, id DESC`, [userId]);
       return toRows(result).map(mapRecord);
     },
-    async create(type, record) {
+    async create(type, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = await pool.query(
         `
-          INSERT INTO ${table} (date, amount, category, description, payment_method)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO ${table} (date, amount, category, description, payment_method, user_id)
+          VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING *
         `,
-        [record.date, record.amount, record.category, record.description, record.paymentMethod]
+        [record.date, record.amount, record.category, record.description, record.paymentMethod, userId]
       );
       return mapRecord(toRows(result)[0]);
     },
-    async update(type, id, record) {
+    async update(type, id, record, userId) {
       const { table } = getLedgerConfig(type);
       const result = await pool.query(
         `
@@ -250,26 +315,27 @@ async function createPostgresStore() {
               description = $4,
               payment_method = $5,
               updated_at = NOW()
-          WHERE id = $6
+          WHERE id = $6 AND user_id = $7
           RETURNING *
         `,
-        [record.date, record.amount, record.category, record.description, record.paymentMethod, id]
+        [record.date, record.amount, record.category, record.description, record.paymentMethod, id, userId]
       );
       return result.rowCount === 0 ? null : mapRecord(toRows(result)[0]);
     },
-    async delete(type, id) {
+    async delete(type, id, userId) {
       const { table } = getLedgerConfig(type);
-      const result = await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+      const result = await pool.query(`DELETE FROM ${table} WHERE id = $1 AND user_id = $2`, [id, userId]);
       return result.rowCount > 0;
     },
-    async listCategories(type) {
+    async listCategories(type, userId) {
       const { table } = getLedgerConfig(type);
       const result = await pool.query(
-        `SELECT DISTINCT category FROM ${table} WHERE category IS NOT NULL AND category != '' ORDER BY category`
+        `SELECT DISTINCT category FROM ${table} WHERE user_id = $1 AND category IS NOT NULL AND category != '' ORDER BY category`,
+        [userId]
       );
       return result.rows.map((r) => r.category);
     },
-    async summary(type) {
+    async summary(type, userId) {
       const { table } = getLedgerConfig(type);
       const today = new Date().toISOString().slice(0, 10);
       const month = today.slice(0, 7);
@@ -281,21 +347,24 @@ async function createPostgresStore() {
               COALESCE(SUM(amount) FILTER (WHERE date = $1::date), 0) AS today,
               COALESCE(SUM(amount) FILTER (WHERE to_char(date, 'YYYY-MM') = $2), 0) AS month
             FROM ${table}
+            WHERE user_id = $3
           `,
-          [today, month]
+          [today, month, userId]
         ),
-        pool.query(`
-          SELECT category, ROUND(SUM(amount), 2)::float AS amount
-          FROM ${table}
-          GROUP BY category
-          ORDER BY amount DESC
-        `),
-        pool.query(`
-          SELECT to_char(date, 'YYYY-MM') AS month, ROUND(SUM(amount), 2)::float AS amount
-          FROM ${table}
-          GROUP BY to_char(date, 'YYYY-MM')
-          ORDER BY month ASC
-        `)
+        pool.query(
+          `SELECT category, ROUND(SUM(amount), 2)::float AS amount FROM ${table} WHERE user_id = $1 GROUP BY category ORDER BY amount DESC`,
+          [userId]
+        ),
+        pool.query(
+          `
+            SELECT to_char(date, 'YYYY-MM') AS month, ROUND(SUM(amount), 2)::float AS amount
+            FROM ${table}
+            WHERE user_id = $1
+            GROUP BY to_char(date, 'YYYY-MM')
+            ORDER BY month ASC
+          `,
+          [userId]
+        )
       ]);
 
       return {
@@ -328,10 +397,27 @@ function requireLedger(req, res, next) {
   next();
 }
 
+function requireAuth(req, res, next) {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "יש להתחבר תחילה." });
+    return;
+  }
+  next();
+}
+
 async function main() {
   const store = databaseUrl ? await createPostgresStore() : createSqliteStore();
 
   app.use(express.json());
+  app.use(session({
+    secret: process.env.SESSION_SECRET || "change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    }
+  }));
   app.use("/vendor/chart.js", express.static(path.join(__dirname, "..", "node_modules", "chart.js", "dist")));
   app.use(express.static(path.join(__dirname, "..", "public")));
 
@@ -339,29 +425,101 @@ async function main() {
     res.json({ ok: true, database: store.name });
   });
 
-  app.get("/api/:type/categories", requireLedger, (req, res) => {
+  app.post("/api/auth/register", asyncHandler(async (req, res) => {
+    const { username, password } = req.body || {};
+
+    if (!username || typeof username !== "string" || username.trim().length < 2 || username.trim().length > 50) {
+      res.status(400).json({ error: "שם המשתמש חייב להכיל בין 2 ל-50 תווים." });
+      return;
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
+      res.status(400).json({ error: "הסיסמה חייבת להכיל לפחות 6 תווים." });
+      return;
+    }
+
+    const trimmedUsername = username.trim();
+    const existing = await store.findUserByUsername(trimmedUsername);
+    if (existing) {
+      res.status(409).json({ error: "שם המשתמש כבר קיים במערכת." });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await store.createUser(trimmedUsername, passwordHash);
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    res.status(201).json({ user: { id: user.id, username: user.username } });
+  }));
+
+  app.post("/api/auth/login", asyncHandler(async (req, res) => {
+    const { username, password } = req.body || {};
+
+    if (!username || !password) {
+      res.status(400).json({ error: "יש להזין שם משתמש וסיסמה." });
+      return;
+    }
+
+    const user = await store.findUserByUsername(String(username).trim());
+    if (!user) {
+      res.status(401).json({ error: "שם המשתמש או הסיסמה שגויים." });
+      return;
+    }
+
+    const valid = await bcrypt.compare(String(password), user.password_hash);
+    if (!valid) {
+      res.status(401).json({ error: "שם המשתמש או הסיסמה שגויים." });
+      return;
+    }
+
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    res.json({ user: { id: user.id, username: user.username } });
+  }));
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.json({ ok: true });
+    });
+  });
+
+  app.get("/api/auth/me", asyncHandler(async (req, res) => {
+    if (!req.session.userId) {
+      res.status(401).json({ error: "לא מחובר." });
+      return;
+    }
+    const user = await store.findUserById(req.session.userId);
+    if (!user) {
+      req.session.destroy(() => {});
+      res.status(401).json({ error: "המשתמש לא נמצא." });
+      return;
+    }
+    res.json({ user: { id: user.id, username: user.username } });
+  }));
+
+  app.get("/api/:type/categories", requireLedger, requireAuth, (req, res) => {
     res.json({ categories: req.ledger.categories });
   });
 
-  app.get("/api/:type", requireLedger, asyncHandler(async (req, res) => {
-    const records = await store.list(req.params.type);
+  app.get("/api/:type", requireLedger, requireAuth, asyncHandler(async (req, res) => {
+    const records = await store.list(req.params.type, req.session.userId);
     res.json({ [req.ledger.singular + "s"]: records, records });
   }));
 
-  app.post("/api/:type", requireLedger, asyncHandler(async (req, res) => {
+  app.post("/api/:type", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const normalized = normalizeRecord(req.body);
     if (normalized.error) {
       res.status(400).json({ error: normalized.error });
       return;
     }
 
-    const record = await store.create(req.params.type, normalized.value);
+    const record = await store.create(req.params.type, normalized.value, req.session.userId);
     res.status(201).json({ [req.ledger.singular]: record, record });
   }));
 
-  app.post("/api/:type/import", requireLedger, asyncHandler(async (req, res) => {
+  app.post("/api/:type/import", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const records = req.body;
-    
+
     if (!Array.isArray(records)) {
       res.status(400).json({ error: "צפוי array של records" });
       return;
@@ -389,7 +547,7 @@ async function main() {
       }
 
       try {
-        const created = await store.create(req.params.type, normalized.value);
+        const created = await store.create(req.params.type, normalized.value, req.session.userId);
         imported.push(created);
       } catch (err) {
         errors.push({ row: i + 1, error: err.message });
@@ -404,11 +562,11 @@ async function main() {
     });
   }));
 
-  app.get("/api/:type/summary", requireLedger, asyncHandler(async (req, res) => {
-    res.json(await store.summary(req.params.type));
+  app.get("/api/:type/summary", requireLedger, requireAuth, asyncHandler(async (req, res) => {
+    res.json(await store.summary(req.params.type, req.session.userId));
   }));
 
-  app.put("/api/:type/:id", requireLedger, asyncHandler(async (req, res) => {
+  app.put("/api/:type/:id", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       res.status(400).json({ error: "מזהה הרשומה לא תקין." });
@@ -421,7 +579,7 @@ async function main() {
       return;
     }
 
-    const record = await store.update(req.params.type, id, normalized.value);
+    const record = await store.update(req.params.type, id, normalized.value, req.session.userId);
     if (!record) {
       res.status(404).json({ error: "הרשומה לא נמצאה." });
       return;
@@ -430,14 +588,14 @@ async function main() {
     res.json({ [req.ledger.singular]: record, record });
   }));
 
-  app.delete("/api/:type/:id", requireLedger, asyncHandler(async (req, res) => {
+  app.delete("/api/:type/:id", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       res.status(400).json({ error: "מזהה הרשומה לא תקין." });
       return;
     }
 
-    const deleted = await store.delete(req.params.type, id);
+    const deleted = await store.delete(req.params.type, id, req.session.userId);
     if (!deleted) {
       res.status(404).json({ error: "הרשומה לא נמצאה." });
       return;
