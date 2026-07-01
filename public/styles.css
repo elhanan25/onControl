@@ -842,11 +842,59 @@ tbody tr:hover {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.user-email {
+.user-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0 4px;
+  gap: 6px;
+}
+
+.user-info-row #userLabel {
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.78rem;
   word-break: break-all;
+}
+
+.link-button-sidebar {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.link-button-sidebar:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+#updateEmailForm {
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#updateEmailForm input {
+  min-height: 34px;
+  font-size: 0.82rem;
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.2);
+  color: white;
+}
+
+#updateEmailForm .form-message {
+  font-size: 0.78rem;
+  min-height: 14px;
+  margin: 0;
+}
+
+#updateEmailForm .small-button {
+  align-self: flex-start;
 }
 
 .logout-button {

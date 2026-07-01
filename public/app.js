@@ -907,6 +907,37 @@ els.registerForm.addEventListener("submit", async (event) => {
   }
 });
 
+document.querySelector("#updateEmailBtn").addEventListener("click", () => {
+  document.querySelector("#updateEmailForm").classList.toggle("hidden");
+  document.querySelector("#updateEmailMsg").textContent = "";
+  document.querySelector("#updateEmailMsg").className = "form-message";
+});
+
+document.querySelector("#saveEmailBtn").addEventListener("click", async () => {
+  const msg = document.querySelector("#updateEmailMsg");
+  const email = document.querySelector("#updateEmailInput").value;
+  msg.textContent = "";
+  msg.className = "form-message";
+  try {
+    const response = await fetch("/api/auth/update-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      msg.className = "form-message error";
+      msg.textContent = data.error;
+      return;
+    }
+    msg.textContent = "נשמר!";
+    setTimeout(() => document.querySelector("#updateEmailForm").classList.add("hidden"), 1500);
+  } catch {
+    msg.className = "form-message error";
+    msg.textContent = "שגיאה.";
+  }
+});
+
 els.logoutButton.addEventListener("click", async () => {
   try {
     await fetch("/api/auth/logout", { method: "POST" });

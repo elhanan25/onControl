@@ -81,7 +81,15 @@
           </button>
         </nav>
         <div class="sidebar-footer">
-          <span class="user-email" id="userLabel"></span>
+          <div class="user-info-row">
+            <span id="userLabel"></span>
+            <button class="link-button-sidebar" id="updateEmailBtn" type="button">מייל</button>
+          </div>
+          <div id="updateEmailForm" class="hidden">
+            <input type="email" id="updateEmailInput" placeholder="המייל שלך" autocomplete="email">
+            <p class="form-message" id="updateEmailMsg" role="status"></p>
+            <button class="small-button" id="saveEmailBtn" type="button">שמור</button>
+          </div>
           <button class="nav-item logout-button" type="button" id="logoutButton">
             <span class="nav-icon">←</span>
             <span>יציאה</span>

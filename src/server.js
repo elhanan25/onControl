@@ -203,6 +203,10 @@ function createSqliteStore() {
       db.prepare(`DELETE FROM password_reset_tokens WHERE token = ?`).run(token);
     },
 
+    updateEmail(userId, email) {
+      db.prepare(`UPDATE users SET email = ? WHERE id = ?`).run(email, userId);
+    },
+
     async list(type, userId) {
       const { table } = getLedgerConfig(type);
       return db
@@ -373,6 +377,10 @@ async function createPostgresStore() {
       await pool.query(`DELETE FROM password_reset_tokens WHERE token = $1`, [token]);
     },
 
+    async updateEmail(userId, email) {
+      await pool.query(`UPDATE users SET email = $1 WHERE id = $2`, [email, userId]);
+    },
+
     async list(type, userId) {
       const { table } = getLedgerConfig(type);
       const result = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1 ORDER BY date DESC, id DESC`, [userId]);
@@ -539,6 +547,16 @@ async function main() {
     req.session.userId = user.id;
     req.session.username = user.username;
     res.status(201).json({ user: { id: user.id, username: user.username } });
+  }));
+
+  app.post("/api/auth/update-email", requireAuth, asyncHandler(async (req, res) => {
+    const { email } = req.body || {};
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      res.status(400).json({ error: "כתובת מייל לא תקינה." });
+      return;
+    }
+    await store.updateEmail(req.session.userId, email.trim().toLowerCase());
+    res.json({ ok: true });
   }));
 
   app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
