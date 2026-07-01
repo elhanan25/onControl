@@ -23,21 +23,40 @@
           <h2>כניסה למערכת</h2>
           <form id="loginForm">
             <label>שם משתמש<input type="text" id="loginUsername" autocomplete="username" required></label>
-            <label>סיסמה<input type="password" id="loginPassword" autocomplete="current-password" required></label>
+            <label>סיסמה<span class="password-wrapper"><input type="password" id="loginPassword" autocomplete="current-password" required><button type="button" class="eye-btn" tabindex="-1" aria-label="הצג סיסמה"></button></span></label>
             <p class="form-message" id="loginMessage" role="status"></p>
             <button class="primary-button" type="submit">כניסה</button>
           </form>
+          <button class="link-button" type="button" id="showForgotBtn">שכחתי סיסמה</button>
           <button class="link-button" type="button" id="showRegisterBtn">אין לך חשבון? הירשם</button>
         </div>
         <div id="registerSection" class="hidden">
           <h2>הרשמה</h2>
           <form id="registerForm">
             <label>שם משתמש<input type="text" id="regUsername" autocomplete="username" required></label>
-            <label>סיסמה (לפחות 6 תווים)<input type="password" id="regPassword" autocomplete="new-password" required minlength="6"></label>
+            <label>מייל (לשחזור סיסמה)<input type="email" id="regEmail" autocomplete="email"></label>
+            <label>סיסמה (לפחות 6 תווים)<span class="password-wrapper"><input type="password" id="regPassword" autocomplete="new-password" required minlength="6"><button type="button" class="eye-btn" tabindex="-1" aria-label="הצג סיסמה"></button></span></label>
             <p class="form-message" id="registerMessage" role="status"></p>
             <button class="primary-button" type="submit">הרשמה</button>
           </form>
           <button class="link-button" type="button" id="showLoginBtn">יש לך חשבון? התחבר</button>
+        </div>
+        <div id="forgotSection" class="hidden">
+          <h2>שחזור סיסמה</h2>
+          <form id="forgotForm">
+            <label>כתובת מייל<input type="email" id="forgotEmail" autocomplete="email" required></label>
+            <p class="form-message" id="forgotMessage" role="status"></p>
+            <button class="primary-button" type="submit">שלח קישור</button>
+          </form>
+          <button class="link-button" type="button" id="showLoginFromForgotBtn">חזרה לכניסה</button>
+        </div>
+        <div id="resetSection" class="hidden">
+          <h2>סיסמה חדשה</h2>
+          <form id="resetForm">
+            <label>סיסמה חדשה (לפחות 6 תווים)<span class="password-wrapper"><input type="password" id="resetPassword" autocomplete="new-password" required minlength="6"><button type="button" class="eye-btn" tabindex="-1" aria-label="הצג סיסמה"></button></span></label>
+            <p class="form-message" id="resetMessage" role="status"></p>
+            <button class="primary-button" type="submit">שמור סיסמה</button>
+          </form>
         </div>
       </div>
     </div>

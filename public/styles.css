@@ -802,6 +802,35 @@ tbody tr:hover {
   text-decoration: underline;
 }
 
+.password-wrapper {
+  position: relative;
+  display: block;
+}
+
+.password-wrapper input {
+  padding-left: 38px;
+}
+
+.eye-btn {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  min-height: unset;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.eye-btn:hover {
+  color: var(--ink);
+}
+
 /* ── Sidebar footer ─────────────────────────────────────────────────────── */
 
 .sidebar-footer {

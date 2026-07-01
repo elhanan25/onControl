@@ -1,10 +1,20 @@
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const express = require("express");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
+
+function createEmailTransport() {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return null;
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD }
+  });
+}
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -138,13 +148,23 @@ function createSqliteStore() {
     try { db.exec(`ALTER TABLE ${config.table} ADD COLUMN user_id INTEGER`) } catch {}
   });
 
+  try { db.exec(`ALTER TABLE users ADD COLUMN email TEXT`) } catch {}
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      expires_at TEXT NOT NULL
+    )
+  `);
+
   return {
     name: "SQLite",
 
-    createUser(username, passwordHash) {
+    createUser(username, passwordHash, email) {
       const result = db
-        .prepare(`INSERT INTO users (username, password_hash) VALUES (?, ?)`)
-        .run(username, passwordHash);
+        .prepare(`INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)`)
+        .run(username, passwordHash, email || null);
       return db.prepare(`SELECT id, username FROM users WHERE id = ?`).get(result.lastInsertRowid);
     },
 
@@ -152,8 +172,34 @@ function createSqliteStore() {
       return db.prepare(`SELECT * FROM users WHERE username = ?`).get(username);
     },
 
+    findUserByEmail(email) {
+      return db.prepare(`SELECT id, username FROM users WHERE lower(email) = lower(?)`)
+        .get(email) || null;
+    },
+
     findUserById(id) {
       return db.prepare(`SELECT id, username FROM users WHERE id = ?`).get(id);
+    },
+
+    updatePassword(userId, passwordHash) {
+      db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(passwordHash, userId);
+    },
+
+    createResetToken(userId, token, expiresAt) {
+      db.prepare(`DELETE FROM password_reset_tokens WHERE user_id = ?`).run(userId);
+      db.prepare(`INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)`)
+        .run(userId, token, expiresAt);
+    },
+
+    findValidResetToken(token) {
+      const now = new Date().toISOString();
+      return db.prepare(
+        `SELECT prt.user_id, prt.token FROM password_reset_tokens prt WHERE prt.token = ? AND prt.expires_at > ?`
+      ).get(token, now) || null;
+    },
+
+    deleteResetToken(token) {
+      db.prepare(`DELETE FROM password_reset_tokens WHERE token = ?`).run(token);
     },
 
     async list(type, userId) {
@@ -259,6 +305,16 @@ async function createPostgresStore() {
     await pool.query(`ALTER TABLE ${config.table} ADD COLUMN IF NOT EXISTS user_id BIGINT`);
   }));
 
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+
   const toRows = (result) => result.rows.map((row) => ({
     ...row,
     date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date),
@@ -269,10 +325,10 @@ async function createPostgresStore() {
   return {
     name: "PostgreSQL",
 
-    async createUser(username, passwordHash) {
+    async createUser(username, passwordHash, email) {
       const result = await pool.query(
-        `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`,
-        [username, passwordHash]
+        `INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING id, username`,
+        [username, passwordHash, email || null]
       );
       return result.rows[0];
     },
@@ -282,9 +338,38 @@ async function createPostgresStore() {
       return result.rows[0] || null;
     },
 
+    async findUserByEmail(email) {
+      const result = await pool.query(`SELECT id, username FROM users WHERE lower(email) = lower($1)`, [email]);
+      return result.rows[0] || null;
+    },
+
     async findUserById(id) {
       const result = await pool.query(`SELECT id, username FROM users WHERE id = $1`, [id]);
       return result.rows[0] || null;
+    },
+
+    async updatePassword(userId, passwordHash) {
+      await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [passwordHash, userId]);
+    },
+
+    async createResetToken(userId, token, expiresAt) {
+      await pool.query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [userId]);
+      await pool.query(
+        `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+        [userId, token, expiresAt]
+      );
+    },
+
+    async findValidResetToken(token) {
+      const result = await pool.query(
+        `SELECT user_id, token FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW()`,
+        [token]
+      );
+      return result.rows[0] || null;
+    },
+
+    async deleteResetToken(token) {
+      await pool.query(`DELETE FROM password_reset_tokens WHERE token = $1`, [token]);
     },
 
     async list(type, userId) {
@@ -426,7 +511,7 @@ async function main() {
   });
 
   app.post("/api/auth/register", asyncHandler(async (req, res) => {
-    const { username, password } = req.body || {};
+    const { username, password, email } = req.body || {};
 
     if (!username || typeof username !== "string" || username.trim().length < 2 || username.trim().length > 50) {
       res.status(400).json({ error: "שם המשתמש חייב להכיל בין 2 ל-50 תווים." });
@@ -439,6 +524,9 @@ async function main() {
     }
 
     const trimmedUsername = username.trim();
+    const normalizedEmail = email && typeof email === "string" && email.includes("@")
+      ? email.trim().toLowerCase() : null;
+
     const existing = await store.findUserByUsername(trimmedUsername);
     if (existing) {
       res.status(409).json({ error: "שם המשתמש כבר קיים במערכת." });
@@ -446,10 +534,47 @@ async function main() {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await store.createUser(trimmedUsername, passwordHash);
+    const user = await store.createUser(trimmedUsername, passwordHash, normalizedEmail);
     req.session.userId = user.id;
     req.session.username = user.username;
     res.status(201).json({ user: { id: user.id, username: user.username } });
+  }));
+
+  app.post("/api/auth/forgot-password", asyncHandler(async (req, res) => {
+    res.json({ ok: true });
+    const { email } = req.body || {};
+    if (!email || typeof email !== "string" || !email.includes("@")) return;
+    const user = await store.findUserByEmail(email.trim());
+    if (!user) return;
+    const transport = createEmailTransport();
+    if (!transport) return;
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await store.createResetToken(user.id, token, expiresAt);
+    const resetUrl = `${req.protocol}://${req.get("host")}/?token=${token}`;
+    await transport.sendMail({
+      from: `"ניהול כספים" <${process.env.GMAIL_USER}>`,
+      to: email.trim(),
+      subject: "איפוס סיסמה - ניהול כספים",
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif"><p>שלום ${user.username},</p><p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p><p><a href="${resetUrl}">לחץ כאן לאיפוס סיסמה</a></p><p>הקישור תקף לשעה אחת.</p><p>אם לא ביקשת איפוס סיסמה, התעלם ממייל זה.</p></div>`
+    });
+  }));
+
+  app.post("/api/auth/reset-password", asyncHandler(async (req, res) => {
+    const { token, password } = req.body || {};
+    if (!token || !password || typeof password !== "string" || password.length < 6) {
+      res.status(400).json({ error: "נתונים לא תקינים." });
+      return;
+    }
+    const tokenRecord = await store.findValidResetToken(token);
+    if (!tokenRecord) {
+      res.status(400).json({ error: "הקישור לא תקין או שפג תוקפו. בקש קישור חדש." });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    await store.updatePassword(tokenRecord.user_id, passwordHash);
+    await store.deleteResetToken(token);
+    res.json({ ok: true });
   }));
 
   app.post("/api/auth/login", asyncHandler(async (req, res) => {
