@@ -471,9 +471,7 @@ async function refresh() {
 
   state.records = records.records;
   currentPage = 1;
-  const dbCategories = records.records.map((r) => r.category).filter(Boolean);
-  const categories = [...new Set([...state.predefinedCategories, ...dbCategories])].sort((a, b) => a.localeCompare(b, "he"));
-  fillCategoryFilter(categories);
+  fillCategoryFilter(state.predefinedCategories);
   renderRows();
   renderSummary(summary);
   updateSummaryForFilter();
