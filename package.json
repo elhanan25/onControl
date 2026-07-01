@@ -12,6 +12,7 @@
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.9.1",
     "chart.js": "^4.4.8",
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "nodemailer": "^9.0.3",
