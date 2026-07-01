@@ -637,26 +637,39 @@ async function handleExcelUpload(file) {
       throw new Error("הקובץ ריק - לא נמצאו רשומות");
     }
 
-    const allRecords = rows.map((row) => ({
-      date: parseIsraeliDate(extractField(row,
-        "date", "Date", "תאריך", "תאריך עסקה", "תאריך רכישה", "תאריך חיוב", "תאריך ערך", "תאריך פעולה"
-      )),
-      amount: parseAmount(extractField(row,
-        "amount", "Amount", "סכום", "סכום עסקה", "סכום חיוב", "סכום חיוב בש''ח", "סכום חיוב בשח",
-        "חיוב", "סכום בש''ח", "סכום בשח", "original_amount", "סכום מקורי", "סכום ₪", "סכום הוצאה"
-      )),
-      category: String(extractField(row,
-        "category", "Category", "קטגוריה", "ענף", "סוג עסקה", "תחום"
-      )).trim() || "אחר",
-      description: String(extractField(row,
-        "description", "Description", "תיאור", "שם בית עסק", "שם בית העסק", "שם עסק",
-        "מוטב", "פרטים", "merchant_name", "שם המוטב", "בית עסק", "שם"
-      )).trim(),
-      paymentMethod: String(extractField(row,
-        "paymentMethod", "payment_method", "PaymentMethod", "אמצעי תשלום",
-        "כרטיס", "סוג כרטיס", "סוג אשראי", "אמצעי"
-      )).trim() || "אשראי"
-    }));
+    const INCOME_KEYWORDS = ["הכנסה", "הכנסות", "income", "credit", "זיכוי"];
+
+    const allRecords = rows.map((row) => {
+      const rawType = String(extractField(row,
+        "type", "Type", "סוג", "סוג רשומה", "כיוון", "תנועה"
+      )).trim().toLowerCase();
+
+      const recordType = INCOME_KEYWORDS.some(k => rawType.includes(k)) ? "incomes"
+        : rawType ? "expenses"
+        : null;
+
+      return {
+        date: parseIsraeliDate(extractField(row,
+          "date", "Date", "תאריך", "תאריך עסקה", "תאריך רכישה", "תאריך חיוב", "תאריך ערך", "תאריך פעולה"
+        )),
+        amount: parseAmount(extractField(row,
+          "amount", "Amount", "סכום", "סכום עסקה", "סכום חיוב", "סכום חיוב בש''ח", "סכום חיוב בשח",
+          "חיוב", "סכום בש''ח", "סכום בשח", "original_amount", "סכום מקורי", "סכום ₪", "סכום הוצאה"
+        )),
+        category: String(extractField(row,
+          "category", "Category", "קטגוריה", "ענף", "סוג עסקה", "תחום"
+        )).trim() || "אחר",
+        description: String(extractField(row,
+          "description", "Description", "תיאור", "שם בית עסק", "שם בית העסק", "שם עסק",
+          "מוטב", "פרטים", "merchant_name", "שם המוטב", "בית עסק", "שם"
+        )).trim(),
+        paymentMethod: String(extractField(row,
+          "paymentMethod", "payment_method", "PaymentMethod", "אמצעי תשלום",
+          "כרטיס", "סוג כרטיס", "סוג אשראי", "אמצעי"
+        )).trim() || "אשראי",
+        _type: recordType
+      };
+    });
 
     const records = allRecords.filter((r) => r.date && r.amount > 0);
 
@@ -666,38 +679,51 @@ async function handleExcelUpload(file) {
     }
 
     const skipped = allRecords.length - records.length;
-    importMessage.textContent = `נמצאו ${records.length} שורות תקינות${skipped ? ` (${skipped} דולגו - ללא תאריך/סכום)` : ""}. שולח לשרת...`;
+    const hasMixedTypes = records.some(r => r._type !== null);
 
-    // Send to server
-    const response = await api(`${config.api}/import`, {
-      method: "POST",
-      body: JSON.stringify(records)
-    });
+    let totalImported = 0, totalSent = records.length;
 
-    // Update progress
-    const imported = response.imported || 0;
-    const total = response.total || records.length;
-    const percentage = Math.round((imported / total) * 100);
-    
-    progressFill.style.width = percentage + "%";
-    progressText.textContent = percentage + "%";
+    if (hasMixedTypes) {
+      const expenseRecords = records.filter(r => r._type !== "incomes").map(({_type, ...r}) => r);
+      const incomeRecords  = records.filter(r => r._type === "incomes").map(({_type, ...r}) => r);
 
-    let resultMessage = `✓ ייובאו בהצלחה: ${imported}/${total} רשומות`;
-    
-    if (response.errors && response.errors.length > 0) {
-      resultMessage += `\n\nשגיאות (${response.errors.length}):\n`;
-      response.errors.slice(0, 5).forEach((err) => {
-        resultMessage += `• שורה ${err.row}: ${err.error}\n`;
+      importMessage.textContent = `נמצאו ${expenseRecords.length} הוצאות ו-${incomeRecords.length} הכנסות. שולח לשרת...`;
+
+      const [expRes, incRes] = await Promise.all([
+        expenseRecords.length ? api("/api/expenses/import", { method: "POST", body: JSON.stringify(expenseRecords) }) : { imported: 0 },
+        incomeRecords.length  ? api("/api/incomes/import",  { method: "POST", body: JSON.stringify(incomeRecords)  }) : { imported: 0 }
+      ]);
+      totalImported = (expRes.imported || 0) + (incRes.imported || 0);
+
+      progressFill.style.width = "100%";
+      progressText.textContent = "100%";
+      importMessage.textContent = `✓ ייובאו: ${expRes.imported || 0} הוצאות, ${incRes.imported || 0} הכנסות`;
+    } else {
+      importMessage.textContent = `נמצאו ${records.length} שורות תקינות${skipped ? ` (${skipped} דולגו)` : ""}. שולח לשרת...`;
+      const cleanRecords = records.map(({_type, ...r}) => r);
+      const response = await api(`${config.api}/import`, {
+        method: "POST",
+        body: JSON.stringify(cleanRecords)
       });
-      if (response.errors.length > 5) {
-        resultMessage += `... ועוד ${response.errors.length - 5} שגיאות`;
+
+      const imported = response.imported || 0;
+      const total = response.total || records.length;
+      const percentage = Math.round((imported / total) * 100);
+      progressFill.style.width = percentage + "%";
+      progressText.textContent = percentage + "%";
+
+      let resultMessage = `✓ ייובאו בהצלחה: ${imported}/${total} רשומות`;
+      if (response.errors && response.errors.length > 0) {
+        resultMessage += `\n\nשגיאות (${response.errors.length}):\n`;
+        response.errors.slice(0, 5).forEach((err) => {
+          resultMessage += `• שורה ${err.row}: ${err.error}\n`;
+        });
+        if (response.errors.length > 5) resultMessage += `... ועוד ${response.errors.length - 5} שגיאות`;
       }
+      importMessage.textContent = resultMessage;
+      setMessage(`${imported} רשומות נייובאו בהצלחה!`);
     }
 
-    importMessage.textContent = resultMessage;
-    setMessage(`${imported} רשומות נייובאו בהצלחה!`);
-
-    // Reset file input, clear month filter so imported records are visible, and refresh
     document.querySelector("#excelFileInput").value = "";
     setTimeout(() => {
       progressContainer.style.display = "none";
