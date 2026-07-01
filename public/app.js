@@ -555,8 +555,12 @@ els.navItems.forEach((item) => {
 });
 
 function extractField(row, ...keys) {
+  const normalizedRow = {};
+  for (const [k, v] of Object.entries(row)) {
+    normalizedRow[String(k).trim().toLowerCase()] = v;
+  }
   for (const key of keys) {
-    const val = row[key];
+    const val = normalizedRow[String(key).trim().toLowerCase()];
     if (val !== undefined && val !== null && String(val).trim() !== "") {
       return val;
     }
