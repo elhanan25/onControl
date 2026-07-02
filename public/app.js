@@ -639,23 +639,36 @@ async function handleExcelUpload(file) {
 
     const INCOME_KEYWORDS = ["הכנסה", "הכנסות", "income", "credit", "זיכוי"];
 
-    const allRecords = rows.map((row) => {
-      const rawType = String(extractField(row,
-        "type", "Type", "סוג", "סוג רשומה", "כיוון", "תנועה"
-      )).trim().toLowerCase();
+    // Detect Israeli bank format: separate חובה (debit) and זכות (credit) columns
+    const firstRowKeys = Object.keys(rows[0] || {}).map(k => k.trim().toLowerCase());
+    const hasDebitCredit = firstRowKeys.some(k => k === "חובה") && firstRowKeys.some(k => k === "זכות");
 
-      const recordType = INCOME_KEYWORDS.some(k => rawType.includes(k)) ? "incomes"
-        : rawType ? "expenses"
-        : null;
+    const allRecords = rows.map((row) => {
+      let amount, recordType;
+
+      if (hasDebitCredit) {
+        const debit  = parseAmount(extractField(row, "חובה", "debit"));
+        const credit = parseAmount(extractField(row, "זכות", "credit"));
+        if (credit > 0) { amount = credit; recordType = "incomes"; }
+        else            { amount = debit;  recordType = "expenses"; }
+      } else {
+        amount = parseAmount(extractField(row,
+          "amount", "Amount", "סכום", "סכום עסקה", "סכום חיוב", "סכום חיוב בש''ח", "סכום חיוב בשח",
+          "חיוב", "חובה", "סכום בש''ח", "סכום בשח", "original_amount", "סכום מקורי", "סכום ₪", "סכום הוצאה"
+        ));
+        const rawType = String(extractField(row,
+          "type", "Type", "סוג", "סוג רשומה", "כיוון", "תנועה"
+        )).trim().toLowerCase();
+        recordType = INCOME_KEYWORDS.some(k => rawType.includes(k)) ? "incomes"
+          : rawType ? "expenses"
+          : null;
+      }
 
       return {
         date: parseIsraeliDate(extractField(row,
           "date", "Date", "תאריך", "תאריך עסקה", "תאריך רכישה", "תאריך חיוב", "תאריך ערך", "תאריך פעולה"
         )),
-        amount: parseAmount(extractField(row,
-          "amount", "Amount", "סכום", "סכום עסקה", "סכום חיוב", "סכום חיוב בש''ח", "סכום חיוב בשח",
-          "חיוב", "סכום בש''ח", "סכום בשח", "original_amount", "סכום מקורי", "סכום ₪", "סכום הוצאה"
-        )),
+        amount,
         category: String(extractField(row,
           "category", "Category", "קטגוריה", "ענף", "סוג עסקה", "תחום"
         )).trim() || "אחר",
