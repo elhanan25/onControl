@@ -8,6 +8,8 @@ const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
+const Anthropic = require("@anthropic-ai/sdk");
+const { betaTool } = require("@anthropic-ai/sdk/helpers/beta/json-schema");
 
 const benchmarkReference = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "data", "average-spending.json"), "utf8")
@@ -517,6 +519,39 @@ function requireAuth(req, res, next) {
   next();
 }
 
+async function computeBenchmarkComparison(store, userId, month) {
+  const rows = await store.monthlyCategoryTotals("expenses", userId, month);
+  const comparisons = [];
+  const unmatched = [];
+
+  for (const row of rows) {
+    const ref = benchmarkReference.categories[row.category];
+    if (!ref) {
+      unmatched.push(row);
+      continue;
+    }
+    const diffPercent = roundMoney(((row.amount - ref.monthlyAverage) / ref.monthlyAverage) * 100);
+    const status = diffPercent > 15 ? "above" : diffPercent < -15 ? "below" : "similar";
+    comparisons.push({
+      category: row.category,
+      amount: row.amount,
+      monthlyAverage: ref.monthlyAverage,
+      basis: ref.basis,
+      diffPercent,
+      status
+    });
+  }
+
+  return {
+    month,
+    source: benchmarkReference.source,
+    year: benchmarkReference.year,
+    note: benchmarkReference.note,
+    comparisons,
+    unmatched
+  };
+}
+
 async function main() {
   const store = databaseUrl ? await createPostgresStore() : createSqliteStore();
 
@@ -734,36 +769,85 @@ async function main() {
       ? monthParam
       : new Date().toISOString().slice(0, 7);
 
-    const rows = await store.monthlyCategoryTotals("expenses", req.session.userId, month);
-    const comparisons = [];
-    const unmatched = [];
+    res.json(await computeBenchmarkComparison(store, req.session.userId, month));
+  }));
 
-    for (const row of rows) {
-      const ref = benchmarkReference.categories[row.category];
-      if (!ref) {
-        unmatched.push(row);
-        continue;
-      }
-      const diffPercent = roundMoney(((row.amount - ref.monthlyAverage) / ref.monthlyAverage) * 100);
-      const status = diffPercent > 15 ? "above" : diffPercent < -15 ? "below" : "similar";
-      comparisons.push({
-        category: row.category,
-        amount: row.amount,
-        monthlyAverage: ref.monthlyAverage,
-        basis: ref.basis,
-        diffPercent,
-        status
-      });
+  app.post("/api/assistant/chat", requireAuth, asyncHandler(async (req, res) => {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      res.status(503).json({ error: "עוזר ה-AI לא מוגדר (חסר ANTHROPIC_API_KEY)." });
+      return;
     }
 
-    res.json({
-      month,
-      source: benchmarkReference.source,
-      year: benchmarkReference.year,
-      note: benchmarkReference.note,
-      comparisons,
-      unmatched
+    const { message, history } = req.body || {};
+    if (typeof message !== "string" || !message.trim()) {
+      res.status(400).json({ error: "יש לשלוח הודעה." });
+      return;
+    }
+
+    const userId = req.session.userId;
+    const client = new Anthropic();
+
+    const tools = [
+      betaTool({
+        name: "get_category_totals",
+        description: "מחזיר סכומי הוצאות או הכנסות לפי קטגוריה לחודש נתון של המשתמש המחובר.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["expenses", "incomes"], description: "הוצאות או הכנסות" },
+            month: { type: "string", description: "חודש בפורמט YYYY-MM. ברירת מחדל: החודש הנוכחי." }
+          },
+          required: ["type"]
+        },
+        run: async ({ type, month }) => {
+          const resolvedMonth = typeof month === "string" && /^\d{4}-\d{2}$/.test(month)
+            ? month
+            : new Date().toISOString().slice(0, 7);
+          const rows = await store.monthlyCategoryTotals(type, userId, resolvedMonth);
+          return JSON.stringify({ month: resolvedMonth, categories: rows });
+        }
+      }),
+      betaTool({
+        name: "get_benchmark_comparison",
+        description: "משווה את ההוצאות של המשתמש המחובר לחודש נתון לממוצע הוצאה בישראל (חלקו רשמי מהלמ\"ס, חלקו הערכה).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            month: { type: "string", description: "חודש בפורמט YYYY-MM. ברירת מחדל: החודש הנוכחי." }
+          }
+        },
+        run: async ({ month }) => {
+          const resolvedMonth = typeof month === "string" && /^\d{4}-\d{2}$/.test(month)
+            ? month
+            : new Date().toISOString().slice(0, 7);
+          return JSON.stringify(await computeBenchmarkComparison(store, userId, resolvedMonth));
+        }
+      })
+    ];
+
+    const runner = client.beta.messages.toolRunner({
+      model: "claude-haiku-4-5",
+      max_tokens: 1024,
+      system: "אתה עוזר פיננסי בתוך אפליקציית מעקב הוצאות. ענה בעברית, בקצרה, רק על סמך הכלים שברשותך - אל תמציא מספרים. " +
+        "אם משתמשים בכלי ההשוואה לממוצע, ציין בבירור שחלק מהנתונים הם הערכה ולא נתון רשמי (בדוק את שדה basis/note בתוצאה).",
+      tools,
+      messages: [...(Array.isArray(history) ? history : []), { role: "user", content: message }]
     });
+
+    let finalMessage;
+    try {
+      finalMessage = await runner;
+    } catch (err) {
+      res.status(502).json({ error: "פנייה ל-AI נכשלה: " + (err.message || "שגיאה לא ידועה") });
+      return;
+    }
+
+    const reply = finalMessage.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+
+    res.json({ reply });
   }));
 
   app.put("/api/:type/:id", requireLedger, requireAuth, asyncHandler(async (req, res) => {

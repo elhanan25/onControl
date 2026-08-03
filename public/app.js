@@ -51,7 +51,8 @@ const state = {
   filterCategory: "",
   filterSearch: "",
   lastSummary: null,
-  predefinedCategories: []
+  predefinedCategories: [],
+  assistantHistory: []
 };
 
 const PAGE_SIZE = 25;
@@ -832,6 +833,48 @@ document.querySelector("#benchmarkButton").addEventListener("click", async (even
   } finally {
     button.disabled = false;
   }
+});
+
+function appendAssistantMessage(role, text) {
+  const container = document.querySelector("#assistantMessages");
+  const bubble = document.createElement("div");
+  bubble.className = `assistant-message assistant-message-${role}`;
+  bubble.textContent = text;
+  container.appendChild(bubble);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendAssistantMessage(text) {
+  appendAssistantMessage("user", text);
+  state.assistantHistory.push({ role: "user", content: text });
+
+  try {
+    const data = await api("/api/assistant/chat", {
+      method: "POST",
+      body: JSON.stringify({ message: text, history: state.assistantHistory.slice(0, -1) })
+    });
+    appendAssistantMessage("assistant", data.reply);
+    state.assistantHistory.push({ role: "assistant", content: data.reply });
+  } catch (err) {
+    appendAssistantMessage("assistant", err.message || "משהו השתבש. נסה שוב.");
+  }
+}
+
+document.querySelector("#assistantToggle").addEventListener("click", () => {
+  document.querySelector("#assistantPanel").classList.toggle("hidden");
+});
+
+document.querySelector("#assistantClose").addEventListener("click", () => {
+  document.querySelector("#assistantPanel").classList.add("hidden");
+});
+
+document.querySelector("#assistantForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const input = document.querySelector("#assistantInput");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  sendAssistantMessage(text);
 });
 
 els.monthFilter.addEventListener("change", () => {

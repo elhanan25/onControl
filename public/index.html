@@ -248,6 +248,21 @@
           </div>
         </section>
       </main>
+
+      <div id="assistantWidget">
+        <button type="button" id="assistantToggle" class="primary-button">עוזר AI</button>
+        <div id="assistantPanel" class="hidden">
+          <div class="panel-title">
+            <h2>עוזר פיננסי</h2>
+            <button type="button" class="small-button" id="assistantClose">סגור</button>
+          </div>
+          <div id="assistantMessages"></div>
+          <form id="assistantForm">
+            <input type="text" id="assistantInput" placeholder="שאל אותי על ההוצאות שלך..." autocomplete="off">
+            <button type="submit" class="small-button">שלח</button>
+          </form>
+        </div>
+      </div>
     </div>
   </body>
 </html>

@@ -9,6 +9,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.9.1",
     "chart.js": "^4.4.8",
