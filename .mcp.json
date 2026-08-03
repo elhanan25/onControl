@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "budget-benchmark": {
-      "command": "node",
-      "args": ["mcp-server/server.js"]
-    }
-  }
-}

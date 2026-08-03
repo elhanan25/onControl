@@ -428,38 +428,6 @@ function renderSummary(summary) {
   );
 }
 
-const BENCHMARK_STATUS_LABELS = { above: "מעל הממוצע", below: "מתחת לממוצע", similar: "תואם" };
-const BENCHMARK_BASIS_LABELS = { cbs: 'רשמי (הלמ"ס)', estimated: "הערכה" };
-
-function renderBenchmark(data) {
-  const tbody = document.querySelector("#benchmarkBody");
-  const emptyState = document.querySelector("#benchmarkEmpty");
-  const noteEl = document.querySelector("#benchmarkNote");
-
-  const rows = data.comparisons.map((item) => `
-    <tr>
-      <td>${item.category}</td>
-      <td>${formatMoney(item.amount)}</td>
-      <td>${formatMoney(item.monthlyAverage)}</td>
-      <td>${BENCHMARK_BASIS_LABELS[item.basis] || item.basis}</td>
-      <td>${item.diffPercent > 0 ? "+" : ""}${item.diffPercent}%</td>
-      <td>${BENCHMARK_STATUS_LABELS[item.status] || item.status}</td>
-    </tr>
-  `).concat(data.unmatched.map((item) => `
-    <tr>
-      <td>${item.category}</td>
-      <td>${formatMoney(item.amount)}</td>
-      <td colspan="4">אין נתון ייחוס לקטגוריה זו</td>
-    </tr>
-  `));
-
-  tbody.innerHTML = rows.join("");
-  emptyState.classList.toggle("visible", rows.length === 0);
-
-  noteEl.textContent = `מקור: ${data.source} (${data.year}). ${data.note}`;
-  noteEl.classList.remove("hidden");
-}
-
 function applyPageText() {
   const config = currentConfig();
   els.pageEyebrow.textContent = config.eyebrow;
@@ -474,8 +442,6 @@ function applyPageText() {
   els.navItems.forEach((item) => {
     item.classList.toggle("active", item.dataset.page === state.activePage);
   });
-
-  document.querySelector("#benchmarkPanel").classList.toggle("hidden", state.activePage !== "expenses");
 }
 
 function fillCategoryFilter(categories) {
@@ -812,26 +778,6 @@ document.querySelector("#excelFileInput").addEventListener("change", (event) => 
   if (event.target.files[0]) {
     // Auto-upload on file selection (optional - can remove if prefer manual click)
     // handleExcelUpload(event.target.files[0]);
-  }
-});
-
-const benchmarkMonthInput = document.querySelector("#benchmarkMonth");
-if (benchmarkMonthInput && !benchmarkMonthInput.value) {
-  benchmarkMonthInput.value = todayISO().slice(0, 7);
-}
-
-document.querySelector("#benchmarkButton").addEventListener("click", async (event) => {
-  const button = event.currentTarget;
-  const month = benchmarkMonthInput.value || todayISO().slice(0, 7);
-  button.disabled = true;
-  try {
-    const data = await api(`/api/expenses/benchmark?month=${month}`);
-    renderBenchmark(data);
-  } catch (err) {
-    document.querySelector("#benchmarkNote").textContent = err.message || "לא ניתן היה לטעון את ההשוואה.";
-    document.querySelector("#benchmarkNote").classList.remove("hidden");
-  } finally {
-    button.disabled = false;
   }
 });
 
