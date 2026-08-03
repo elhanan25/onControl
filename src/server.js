@@ -9,6 +9,10 @@ const nodemailer = require("nodemailer");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
 
+const benchmarkReference = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "..", "data", "average-spending.json"), "utf8")
+);
+
 function createEmailTransport() {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return null;
   return nodemailer.createTransport({
@@ -286,6 +290,12 @@ function createSqliteStore() {
         category,
         monthly
       };
+    },
+    async monthlyCategoryTotals(type, userId, month) {
+      const { table } = getLedgerConfig(type);
+      return db
+        .prepare(`SELECT category, ROUND(SUM(amount), 2) AS amount FROM ${table} WHERE user_id = ? AND substr(date, 1, 7) = ? GROUP BY category ORDER BY amount DESC`)
+        .all(userId, month);
     }
   };
 }
@@ -470,6 +480,14 @@ async function createPostgresStore() {
         category: category.rows,
         monthly: monthly.rows
       };
+    },
+    async monthlyCategoryTotals(type, userId, month) {
+      const { table } = getLedgerConfig(type);
+      const result = await pool.query(
+        `SELECT category, ROUND(SUM(amount), 2)::float AS amount FROM ${table} WHERE user_id = $1 AND to_char(date, 'YYYY-MM') = $2 GROUP BY category ORDER BY amount DESC`,
+        [userId, month]
+      );
+      return result.rows;
     }
   };
 }
@@ -708,6 +726,44 @@ async function main() {
 
   app.get("/api/:type/summary", requireLedger, requireAuth, asyncHandler(async (req, res) => {
     res.json(await store.summary(req.params.type, req.session.userId));
+  }));
+
+  app.get("/api/expenses/benchmark", requireAuth, asyncHandler(async (req, res) => {
+    const monthParam = req.query.month;
+    const month = typeof monthParam === "string" && /^\d{4}-\d{2}$/.test(monthParam)
+      ? monthParam
+      : new Date().toISOString().slice(0, 7);
+
+    const rows = await store.monthlyCategoryTotals("expenses", req.session.userId, month);
+    const comparisons = [];
+    const unmatched = [];
+
+    for (const row of rows) {
+      const ref = benchmarkReference.categories[row.category];
+      if (!ref) {
+        unmatched.push(row);
+        continue;
+      }
+      const diffPercent = roundMoney(((row.amount - ref.monthlyAverage) / ref.monthlyAverage) * 100);
+      const status = diffPercent > 15 ? "above" : diffPercent < -15 ? "below" : "similar";
+      comparisons.push({
+        category: row.category,
+        amount: row.amount,
+        monthlyAverage: ref.monthlyAverage,
+        basis: ref.basis,
+        diffPercent,
+        status
+      });
+    }
+
+    res.json({
+      month,
+      source: benchmarkReference.source,
+      year: benchmarkReference.year,
+      note: benchmarkReference.note,
+      comparisons,
+      unmatched
+    });
   }));
 
   app.put("/api/:type/:id", requireLedger, requireAuth, asyncHandler(async (req, res) => {

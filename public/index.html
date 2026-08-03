@@ -218,6 +218,30 @@
                 <canvas id="monthlyChart"></canvas>
               </div>
             </section>
+
+            <section class="panel table-panel" id="benchmarkPanel">
+              <div class="panel-title">
+                <h2>השוואה לממוצע השוק</h2>
+                <button type="button" class="small-button" id="benchmarkButton">בדוק השוואה לחודש הנוכחי</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>קטגוריה</th>
+                      <th>ההוצאה שלי</th>
+                      <th>ממוצע השוק</th>
+                      <th>מקור</th>
+                      <th>הפרש</th>
+                      <th>חיווי</th>
+                    </tr>
+                  </thead>
+                  <tbody id="benchmarkBody"></tbody>
+                </table>
+                <p class="empty-state" id="benchmarkEmpty">אין הוצאות בחודש הנוכחי להשוואה.</p>
+              </div>
+              <p id="benchmarkNote" class="hidden"></p>
+            </section>
           </div>
         </section>
       </main>
