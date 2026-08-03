@@ -814,11 +814,17 @@ document.querySelector("#excelFileInput").addEventListener("change", (event) => 
   }
 });
 
+const benchmarkMonthInput = document.querySelector("#benchmarkMonth");
+if (benchmarkMonthInput && !benchmarkMonthInput.value) {
+  benchmarkMonthInput.value = todayISO().slice(0, 7);
+}
+
 document.querySelector("#benchmarkButton").addEventListener("click", async (event) => {
   const button = event.currentTarget;
+  const month = benchmarkMonthInput.value || todayISO().slice(0, 7);
   button.disabled = true;
   try {
-    const data = await api("/api/expenses/benchmark");
+    const data = await api(`/api/expenses/benchmark?month=${month}`);
     renderBenchmark(data);
   } catch (err) {
     document.querySelector("#benchmarkNote").textContent = err.message || "לא ניתן היה לטעון את ההשוואה.";
