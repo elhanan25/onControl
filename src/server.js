@@ -57,6 +57,11 @@ function getLedgerConfig(type) {
   return ledgerTypes[type] || null;
 }
 
+function matchPredefinedCategory(rawCategory, allowedCategories) {
+  const normalized = String(rawCategory || "").trim().replace(/\s+/g, " ");
+  return allowedCategories.find((c) => c === normalized) || "אחר";
+}
+
 function normalizeRecord(input) {
   const date = String(input.date || "").trim();
   const amount = Number(input.amount);
@@ -699,7 +704,8 @@ async function main() {
     const errors = [];
 
     for (let i = 0; i < records.length; i++) {
-      const normalized = normalizeRecord(records[i]);
+      const category = matchPredefinedCategory(records[i].category, req.ledger.categories);
+      const normalized = normalizeRecord({ ...records[i], category });
 
       if (normalized.error) {
         errors.push({ row: i + 1, error: normalized.error });
