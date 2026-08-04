@@ -642,6 +642,10 @@ tbody tr:hover {
   pointer-events: none;
 }
 
+.spinner-overlay.hidden {
+  display: none;
+}
+
 .spinner {
   width: 36px;
   height: 36px;
@@ -1002,6 +1006,10 @@ tbody tr:hover {
   background: var(--surface);
   box-shadow: var(--shadow);
   padding: 12px;
+}
+
+#assistantPanel.hidden {
+  display: none;
 }
 
 #assistantMessages {

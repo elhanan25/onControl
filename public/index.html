@@ -7,10 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260804-ai-assistant">
+    <link rel="stylesheet" href="styles.css?v=20260804-spinner-fix">
     <script src="/vendor/chart.js/chart.umd.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-    <script src="app.js?v=20260804-ai-assistant" defer></script>
+    <script src="app.js?v=20260804-spinner-fix" defer></script>
   </head>
   <body>
     <div class="auth-overlay" id="authOverlay">
@@ -172,6 +172,7 @@
           </div>
 
           <div class="content-stack">
+            <div id="globalSpinner" class="spinner-overlay hidden"><div class="spinner"></div></div>
             <section class="panel table-panel">
               <div class="panel-title">
                 <h2 id="tableTitle">הוצאות אחרונות</h2>

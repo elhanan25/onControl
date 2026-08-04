@@ -139,28 +139,47 @@ function ensureSelectValue(select, value) {
   select.value = value;
 }
 
+let pendingRequests = 0;
+
+function showGlobalSpinner() {
+  pendingRequests += 1;
+  document.querySelector("#globalSpinner")?.classList.remove("hidden");
+}
+
+function hideGlobalSpinner() {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  if (pendingRequests === 0) {
+    document.querySelector("#globalSpinner")?.classList.add("hidden");
+  }
+}
+
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...options
-  });
+  showGlobalSpinner();
+  try {
+    const response = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options
+    });
 
-  if (response.status === 401) {
-    showAuthOverlay("login");
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || "הבקשה נכשלה.");
+    if (response.status === 401) {
+      showAuthOverlay("login");
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "הבקשה נכשלה.");
+    }
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "הבקשה נכשלה.");
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    return response.json();
+  } finally {
+    hideGlobalSpinner();
   }
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || "הבקשה נכשלה.");
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
 }
 
 function setMessage(message, isError = false) {
