@@ -760,13 +760,42 @@ async function main() {
           const rows = await store.monthlyCategoryTotals(type, userId, resolvedMonth);
           return JSON.stringify({ month: resolvedMonth, categories: rows });
         }
+      }),
+      betaTool({
+        name: "create_expense",
+        description: "רושם הוצאה חדשה למשתמש המחובר. הקטגוריה חייבת להיות אחת מהרשימה: " +
+          ledgerTypes.expenses.categories.join(", ") + ".",
+        inputSchema: {
+          type: "object",
+          properties: {
+            amount: { type: "number", description: "סכום ההוצאה בשקלים, חייב להיות חיובי." },
+            category: { type: "string", enum: ledgerTypes.expenses.categories, description: "קטגוריית ההוצאה." },
+            date: { type: "string", description: "תאריך בפורמט YYYY-MM-DD. ברירת מחדל: היום." },
+            description: { type: "string", description: "תיאור חופשי, אופציונלי." }
+          },
+          required: ["amount", "category"]
+        },
+        run: async ({ amount, category, date, description }) => {
+          const normalized = normalizeRecord({
+            date: date || new Date().toISOString().slice(0, 10),
+            amount,
+            category,
+            description
+          });
+          if (normalized.error) {
+            return JSON.stringify({ error: normalized.error });
+          }
+          const record = await store.create("expenses", normalized.value, userId);
+          return JSON.stringify({ created: record });
+        }
       })
     ];
 
     const runner = client.beta.messages.toolRunner({
       model: "claude-haiku-4-5",
       max_tokens: 1024,
-      system: "אתה עוזר פיננסי בתוך אפליקציית מעקב הוצאות. ענה בעברית, בקצרה, רק על סמך הכלים שברשותך - אל תמציא מספרים.",
+      system: "אתה עוזר פיננסי בתוך אפליקציית מעקב הוצאות. ענה בעברית, בקצרה, רק על סמך הכלים שברשותך - אל תמציא מספרים. " +
+        "אם המשתמש מבקש לרשום הוצאה, השתמש בכלי create_expense - בחר את הקטגוריה המתאימה ביותר מהרשימה, ואשר בקצרה מה נרשם.",
       tools,
       messages: [...(Array.isArray(history) ? history : []), { role: "user", content: message }]
     });
